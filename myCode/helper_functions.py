@@ -5,6 +5,7 @@ from random import randrange, uniform
 from random import shuffle
 import numpy as np
 import json
+import random
 import myCode.shared_POS_words_lists as shared_list
 
 ######################
@@ -51,7 +52,7 @@ def get_sentence_batch(train_data,val_data,tree_decoder,arg2):
     def f(data):
         to_return=[]
         for el in data:
-            to_return.append(el['sentence_tree'])
+            to_return.append(random.choice(el['sentence_trees']))
         return to_return
     if tree_decoder:
         return f(train_data), f(val_data)

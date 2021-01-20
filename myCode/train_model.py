@@ -4,9 +4,9 @@ import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
 import myCode.shared_POS_words_lists as shared_list
 from tensorflow_trees.definition import Tree
-from myCode.helper_functions import extract_words_from_tree
+from myCode.helper_functions import extract_words_from_tree, get_image_batch, get_sentence_batch
 
-def train_model(FLAGS, decoder, encoder, input_train, target_train,input_val, target_val,
+def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                 optimizer, beta,lamb,clipping,batch_size,n_exp, name,val_all_captions,
                 tree_encoder, tree_decoder, final=False):
 
@@ -32,7 +32,11 @@ def train_model(FLAGS, decoder, encoder, input_train, target_train,input_val, ta
             loss_word = 0
 
             #TODO shuffle data!
-            #shuffle dataset at beginning of each iteration
+            #input_train,input_val = get_image_batch(train_data,val_data,image_tree==None)
+            #target_train, target_val = get_sentence_batch(train_data,val_data,tree_decoder,args.targets)
+            #TODO da migliorare i passaggi di argomenti a get_sentence e get_image
+            input_train,input_val = get_image_batch(train_data,val_data,False)
+            target_train, target_val = get_sentence_batch(train_data,val_data,True, "a")
             len_input = len(input_train) if type(input_train)==list else input_train.shape[0]
             #input_train,target_train = shuffle_data(input_train,target_train,len_input)
             for j in range(0,len_input,batch_size):
@@ -70,6 +74,7 @@ def train_model(FLAGS, decoder, encoder, input_train, target_train,input_val, ta
                     variables = encoder.variables + decoder.variables
 
                     #compute h and w norm for regularization
+                    #TODO fare meglio regolarizzazione
                     h_norm= tf.norm(root_emb)
                     w_norm=0
                     for w in variables:

@@ -3,7 +3,7 @@ from myCode.models import *
 import tensorflow as tf
 from myCode.train_model import train_model
 
-def validation(input_train, target_train ,input_val, target_val,parameters, FLAGS,input_tree, target_tree, name: str,val_all_captions,test=None) :
+def validation(train_data,val_data,parameters, FLAGS,input_tree, target_tree, name: str,val_all_captions,test=None) :
 
     #open file
     #f= open(name+".txt","ab", buffering=0)
@@ -13,7 +13,7 @@ def validation(input_train, target_train ,input_val, target_val,parameters, FLAG
     	#len(o.meta['target'].children[c].children)) + ' > ' + str(self.max_arity))
 	#ValueError: Maximum Arity Exceeded 11 > 10
 
-    image_max_arity, input_train, sen_max_arity = compute_max_arity(input_train, input_tree, target_train, target_tree)
+    #image_max_arity, input_train, sen_max_arity = compute_max_arity(input_train, input_tree, target_train, target_tree)
 
     #selected actual parameter to try
     i=0
@@ -38,8 +38,8 @@ def validation(input_train, target_train ,input_val, target_val,parameters, FLAG
 
                 activation = getattr(tf.nn, FLAGS.activation)
 
-                decoder, encoder = get_encoder_decoder(emb_tree_size=emb_tree_size,cut_arity=cut_arity,max_arity=max(image_max_arity,
-                    sen_max_arity),max_node_count=max_node_count,max_depth=max_depth,hidden_coeff=hidden_coeff,
+                decoder, encoder = get_encoder_decoder(emb_tree_size=emb_tree_size,cut_arity=cut_arity,max_arity=#max(image_max_arity,sen_max_arity),
+                    30,max_node_count=max_node_count,max_depth=max_depth,hidden_coeff=hidden_coeff,
                     activation=activation,image_tree=input_tree,sentence_tree=target_tree,emb_word_size=emb_word_size,
                     hidden_word=hidden_word,keep_rate=keep_rate)
 
@@ -47,9 +47,7 @@ def validation(input_train, target_train ,input_val, target_val,parameters, FLAG
                 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
                 matched_word_uns,matched_pos_uns, s_avg, bleu, best_n_it= train_model(FLAGS=FLAGS,decoder=decoder,
-                    encoder=encoder,
-                    input_train=input_train,target_train=target_train,
-                    input_val=input_val, target_val=target_val,optimizer=optimizer,
+                    encoder=encoder,train_data=train_data, val_data=val_data ,optimizer=optimizer,
                     beta=beta,lamb=lamb,clipping=clipping,batch_size=batch_size,n_exp=i,name=name,
                     tree_encoder =not(input_tree==None), tree_decoder = not(target_tree==None),final=False,
                     val_all_captions=val_all_captions)
