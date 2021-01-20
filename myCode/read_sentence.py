@@ -11,7 +11,6 @@ def extract_occ(train_data):
         for caption in example['sentence_trees']:
             count_word_tag_occ(caption, word_occ)
     TagValue.update_rep_shape(len(shared_list.tags_idx))
-    sorted_tuples = sorted(word_occ.items(), key=lambda item: item[1],reverse=True)
     return [k for k,v in word_occ.items() if v > 5]
 
 def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
@@ -76,7 +75,7 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
         #check if in tag found in dev set otherwise label as others (last dimension)
         idx = tokenizer.texts_to_sequences([value])
         final_tree.node_type_id="word"
-        final_tree.value=WordValue(representation=tf.one_hot(idx[0][0], WordValue.representation_shape))
+        final_tree.value=WordValue(representation=tf.Variable(idx[0][0]))
 
 
     #RECURSION
@@ -139,7 +138,7 @@ def extraxt_topK_words(word_occ,filters):
     shared_list.word_idx = tokenizer.word_index
     shared_list.idx_word = tokenizer.index_word
     WordValue.update_rep_shape(len(tokenizer.word_index.keys()))
-    print(WordValue.representation_shape)
+    print(len(tokenizer.word_index.keys()))
     return tokenizer,top_k
 
 

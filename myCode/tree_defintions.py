@@ -1,6 +1,7 @@
 from tensorflow_trees.definition import TreeDefinition, NodeDefinition
 import tensorflow as tf
 import myCode.shared_POS_words_lists as shared_list
+import numpy as np
 import sys
 
 ###########
@@ -132,7 +133,7 @@ class WordValue(NodeDefinition.Value):
     """
     class modelling word value i.e. emebedding vector
     """
-    representation_shape = 0    #word number in dataset
+    representation_shape = 1    #word number in dataset
     embedding_size=0    #embedding dimension
     class_value = True
 
@@ -146,12 +147,15 @@ class WordValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        idx = tf.argmax(t[0]).numpy()
-        try:
-            ris = shared_list.idx_word[idx]
-        except IndexError:
-            ris = ""
-        return ris
+        idx = t[0].numpy()
+        if type(idx)==np.int32:
+            try:
+                ris = shared_list.idx_word[idx]
+            except IndexError:
+                ris = ""
+            return ris
+        elif type(idx)==np.ndarray:
+            return shared_list.idx_word[np.argmax(idx)]
 
     @staticmethod
     def abstract_to_representation_batch(v):
