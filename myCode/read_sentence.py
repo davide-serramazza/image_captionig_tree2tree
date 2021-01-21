@@ -66,7 +66,7 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
         except:
             idx = len(shared_list.tags_idx)-1
         final_tree.node_type_id="POS_tag"
-        final_tree.value=TagValue(representation=tf.one_hot(idx, len(shared_list.tags_idx)))
+        final_tree.value=TagValue(representation=tf.Variable(idx))
         final_tree.children = []
         for child in xml_tree.getchildren():
             final_tree.children.append(Tree(node_type_id="tmp"))

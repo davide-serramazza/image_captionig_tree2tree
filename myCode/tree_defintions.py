@@ -105,12 +105,17 @@ class TagValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        idx = tf.argmax(t[0])
-        try:
-            ris = shared_list.tags_idx[idx]
-        except IndexError:
-            ris = "not_found"
-        return ris
+        idx = t[0].numpy()
+        if type(idx)==np.int32:
+            try:
+                ris = shared_list.tags_idx[idx]
+            except IndexError:
+                ris = "not_found"
+            return ris
+        elif type(idx)==np.ndarray:
+            return shared_list.tags_idx[np.argmax(idx)]
+        else:
+            raise ValueError ("tag value of unknown type")
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -119,15 +124,12 @@ class TagValue(NodeDefinition.Value):
         :param v:
         :return:
         """
-        if type(v)==list:
-            ris=[]
-            for el in v:
-                idx = shared_list.tags_idx.index(el)
-                ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
-            return ris
-        else:
-            idx = shared_list.tags_idx.index(v)
-            return  tf.one_hot(idx,TagValue.representation_shape)
+        ris=[]
+        for el in v:
+            idx = shared_list.tags_idx.index(el)
+            ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
+        return ris
+
 
 class WordValue(NodeDefinition.Value):
     """
@@ -156,6 +158,8 @@ class WordValue(NodeDefinition.Value):
             return ris
         elif type(idx)==np.ndarray:
             return shared_list.idx_word[np.argmax(idx)]
+        else:
+            raise ValueError ("word value of unknown type")
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -164,15 +168,12 @@ class WordValue(NodeDefinition.Value):
         :param v:
         :return:
         """
-        #if type(v)==list:
         ris=[]
         for el in v:
             idx = shared_list.word_idx[el]
             ris.append( tf.one_hot(idx,WordValue.representation_shape) )
         return ris
-        #else:
-        #    idx = shared_list.word_idx.index(v)
-        #    return tf.one_hot(idx,WordValue.representation_shape)
+
 
 class SentenceTree:
     """
