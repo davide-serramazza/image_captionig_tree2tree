@@ -1,6 +1,7 @@
 import tensorflow.contrib.eager as tfe
 import tensorflow.contrib.summary as tfs
 import tensorflow as tf
+import random
 from nltk.translate.bleu_score import corpus_bleu
 import myCode.shared_POS_words_lists as shared_list
 from tensorflow_trees.definition import Tree
@@ -21,6 +22,7 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
         FLAGS.check_every = 10
 
     #tensorboard
+    #TODO cambiare nome in parametri che sto usando
     summary_writer = tfs.create_file_writer(FLAGS.model_dir+name+"/" +str(n_exp), flush_millis=1000)
     summary_writer.set_as_default()
 
@@ -31,9 +33,8 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
             loss_POS = 0
             loss_word = 0
 
-            #TODO shuffle data!
-            #input_train,input_val = get_image_batch(train_data,val_data,image_tree==None)
-            #target_train, target_val = get_sentence_batch(train_data,val_data,tree_decoder,args.targets)
+            #shuffle data
+            random.shuffle(train_data)
             #TODO da migliorare i passaggi di argomenti a get_sentence e get_image
             input_train,input_val = get_image_batch(train_data,val_data,False)
             target_train, target_val = get_sentence_batch(train_data,val_data,True, "a")

@@ -198,6 +198,7 @@ def shuffle_data(input,target,len_input):
     return input_shuffled, target_shuffled
 
 def max_arity (list):
+    #TODO probabilmente da cancellare
     """
     funtion to get the msx_arity in data set
     :param list: list of tree(dataset)
@@ -246,7 +247,19 @@ def extract_words_from_tree(trees):
     return to_return
 
 
-def compute_max_arity(input_train, input_tree, target_train, target_tree):
+def compute_max_arity(train_data, val_data):
+    img_max_arity=0
+    sen_max_arity=0
+    for el in train_data+val_data:
+        current_img_arity = get_tree_arity(el['img_tree'])
+        if current_img_arity>img_max_arity:
+            img_max_arity=current_img_arity
+        for caption in el['sentence_trees']:
+            current_sen_arity = get_tree_arity(caption)
+            if current_sen_arity>sen_max_arity:
+                sen_max_arity=current_sen_arity
+    return img_max_arity,sen_max_arity
+"""
     if input_tree != None:
         train_image_max_arity = max_arity(input_train)
         val_image_max_arity = 0
@@ -262,3 +275,4 @@ def compute_max_arity(input_train, input_tree, target_train, target_tree):
     else:
         sen_max_arity = 0
     return image_max_arity, input_train, sen_max_arity
+"""

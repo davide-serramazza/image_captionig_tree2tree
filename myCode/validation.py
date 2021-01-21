@@ -8,12 +8,7 @@ def validation(train_data,val_data,parameters, FLAGS,input_tree, target_tree, na
     #open file
     #f= open(name+".txt","ab", buffering=0)
 
-    #compute max_arity
-    #TODO capire perché ho errore
-    	#len(o.meta['target'].children[c].children)) + ' > ' + str(self.max_arity))
-	#ValueError: Maximum Arity Exceeded 11 > 10
-
-    #image_max_arity, input_train, sen_max_arity = compute_max_arity(input_train, input_tree, target_train, target_tree)
+    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data)
 
     #selected actual parameter to try
     i=0
@@ -38,8 +33,8 @@ def validation(train_data,val_data,parameters, FLAGS,input_tree, target_tree, na
 
                 activation = getattr(tf.nn, FLAGS.activation)
 
-                decoder, encoder = get_encoder_decoder(emb_tree_size=emb_tree_size,cut_arity=cut_arity,max_arity=#max(image_max_arity,sen_max_arity),
-                    30,max_node_count=max_node_count,max_depth=max_depth,hidden_coeff=hidden_coeff,
+                decoder, encoder = get_encoder_decoder(emb_tree_size=emb_tree_size,cut_arity=cut_arity,max_arity=max(image_max_arity,
+                    sen_max_arity),max_node_count=max_node_count,max_depth=max_depth,hidden_coeff=hidden_coeff,
                     activation=activation,image_tree=input_tree,sentence_tree=target_tree,emb_word_size=emb_word_size,
                     hidden_word=hidden_word,keep_rate=keep_rate)
 
