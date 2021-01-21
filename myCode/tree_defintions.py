@@ -105,15 +105,16 @@ class TagValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
+        s=shared_list
         idx = t[0].numpy()
         if type(idx)==np.int32:
             try:
-                ris = shared_list.tags_idx[idx]
+                ris = shared_list.idx_tag[idx]
             except IndexError:
                 ris = "not_found"
             return ris
         elif type(idx)==np.ndarray:
-            return shared_list.tags_idx[np.argmax(idx)]
+            return shared_list.idx_tag[np.argmax(idx)]
         else:
             raise ValueError ("tag value of unknown type")
 
@@ -126,7 +127,7 @@ class TagValue(NodeDefinition.Value):
         """
         ris=[]
         for el in v:
-            idx = shared_list.tags_idx.index(el)
+            idx = shared_list.tag_idx[el]
             ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
         return ris
 

@@ -7,10 +7,12 @@ from tensorflow_trees.definition import Tree
 
 def extract_occ(train_data):
     word_occ = {}
+    shared_list.tag_idx['<tunk>']=0
+    shared_list.idx_tag[0] = '<tunk>'
     for example in train_data:
         for caption in example['sentence_trees']:
             count_word_tag_occ(caption, word_occ)
-    TagValue.update_rep_shape(len(shared_list.tags_idx))
+    TagValue.update_rep_shape(len(shared_list.tag_idx))
     return [k for k,v in word_occ.items() if v > 5]
 
 def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
@@ -29,8 +31,9 @@ def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
             words_occ[value.lower()]=1
     #if current word is a tag
     elif sen_tree.tag == "node":
-        if (value not in shared_list.tags_idx) and (value!="ROOT"):
-            shared_list.tags_idx.append(value)
+        if (value not in shared_list.tag_idx) and (value != "ROOT"):
+            shared_list.tag_idx[value]=len(shared_list.idx_tag)
+            shared_list.idx_tag[len(shared_list.idx_tag)] = value
 
     #recursion
     for child in sen_tree.getchildren():
@@ -62,9 +65,9 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
     if xml_tree.tag == "node" and value!="ROOT":
         #check if in frequent word in dev set otherwise label as others (last dimension)
         try:
-            idx = shared_list.tags_idx.index(value)
+            idx = shared_list.tag_idx[value]
         except:
-            idx = len(shared_list.tags_idx)-1
+            idx = 0
         final_tree.node_type_id="POS_tag"
         final_tree.value=TagValue(representation=tf.constant(idx))
         final_tree.children = []
@@ -95,7 +98,6 @@ def label_tree_with_sentenceTree(train_data, val_data, base_path):
     :return:
     """
     #read xml file first
-    s=shared_list
     for data in train_data + val_data:
         name = data['name']
         #after got file name, read tree from xml file
@@ -122,8 +124,8 @@ def label_final_trees_with_data(tokenizer, train_data, val_data):
             if final_tree.value.abstract_value == "S":
                 caption_trees.append(final_tree)
             else:
-                idx = shared_list.tags_idx.index("S")
-                tag = TagValue(representation=tf.one_hot(idx, len(shared_list.tags_idx)))
+                idx = shared_list.tag_idx["S"]
+                tag = TagValue(representation=tf.one_hot(idx, len(shared_list.tag_idx)))
                 S_node = Tree(node_type_id="POS_tag", children=[final_tree], value=tag)
                 caption_trees.append(S_node)
         data['sentence_trees'] = caption_trees

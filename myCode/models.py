@@ -2,7 +2,7 @@ from tensorflow_trees.decoder import Decoder, DecoderCellsBuilder
 from tensorflow_trees.encoder import Encoder, EncoderCellsBuilder
 from myCode.tree_defintions import WordValue
 from myCode.CNN_encoder import CNN_Encoder
-from myCode.RNN_decoder import BahdanauAttention, BahdanauAttention,RNN_Decoder
+from myCode.RNN_decoder import BahdanauAttention,RNN_Decoder
 
 # cut_arity è il numero di nodi che vengono passati direttamente all'encodder flat, se = n l'input n+1 è
 # l'attention applicata a tutti gli altri i   nput
