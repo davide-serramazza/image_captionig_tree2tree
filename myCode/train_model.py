@@ -8,7 +8,7 @@ from tensorflow_trees.definition import Tree
 from myCode.helper_functions import extract_words_from_tree, get_image_batch, get_sentence_batch
 
 def train_model(FLAGS, decoder, encoder, train_data, val_data ,
-                optimizer, beta,lamb,clipping,batch_size,n_exp, name,val_all_captions,
+                optimizer, beta,lamb,clipping,batch_size,val_all_captions,
                 tree_encoder, tree_decoder, final=False):
 
     best_n_it = 0
@@ -23,7 +23,7 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
 
     #tensorboard
     #TODO cambiare nome in parametri che sto usando
-    summary_writer = tfs.create_file_writer(FLAGS.model_dir+name+"/" +str(n_exp), flush_millis=1000)
+    summary_writer = tfs.create_file_writer(FLAGS.model_dir+"/a" , flush_millis=1000)
     summary_writer.set_as_default()
 
     with tfs.always_record_summaries():
@@ -75,7 +75,7 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                     variables = encoder.variables + decoder.variables
 
                     #compute h and w norm for regularization
-                    h_norm= tf.norm(root_emb)
+                    h_norm= tf.norm(root_emb,ord=1)
                     w_norm= tf.add_n([tf.nn.l2_loss(v) for v in variables])
 
                     # compute gradient
@@ -95,7 +95,7 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
             loss_POS  /= (int(int(len_input)/batch_size)+1)
             loss_word /= (int(int(len_input)/batch_size)+1)
             loss = loss_struct+loss_value
-            print(name,":iterartion",i,loss,loss_word,loss_POS)
+            print("iterartion",i,loss,loss_word,loss_POS)
 
             tfs.scalar("loss/loss_struc", loss_struct)
             tfs.scalar("loss/loss_value", loss_value)
@@ -158,7 +158,7 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                           "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg,
                           " bleu-1 ", bleu_1," bleu-2 ", bleu_2," bleu-3 ", bleu_3," bleu-4 ", bleu_4,"\n\n\n\n")
                 else:
-                    print(name,":iteration ", i," bleu-1 ", bleu_1," bleu-2 ", bleu_2," bleu-3 ", bleu_3," bleu-4 ", bleu_4)
+                    print("iteration ", i," bleu-1 ", bleu_1," bleu-2 ", bleu_2," bleu-3 ", bleu_3," bleu-4 ", bleu_4)
                     loss_validation=0
                     matched_word_uns=0
                     matched_pos_uns=0
@@ -177,8 +177,6 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                     best_loss=loss_validation
                 #else:
                 #    break
-
-    return best_matched_word,best_matched_pos, best_struct,best_bleu, best_n_it
 
 
 def loss_function(real, pred):
