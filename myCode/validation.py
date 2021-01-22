@@ -33,6 +33,7 @@ def main():
     clipping = 0.02
     batch_size = 32
     parser.add_argument('emb_word_size', type=int, help="size of word embedding i.e. hidden coefficient")
+    #TODO da mettere come float se tenuto come coefficiente o come int se a se stante
     parser.add_argument('rnn_unit_size', type=int, help="size of rnn expressed as coefficient relative to embedding size")
     keep_rate=1.0
 
