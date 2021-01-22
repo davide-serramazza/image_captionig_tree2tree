@@ -75,21 +75,16 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                     variables = encoder.variables + decoder.variables
 
                     #compute h and w norm for regularization
-                    #TODO fare meglio regolarizzazione
                     h_norm= tf.norm(root_emb)
-                    w_norm=0
-                    for w in variables:
-                        norm = tf.norm(w)
-                        if norm >= 0.001:
-                            w_norm += norm
+                    w_norm= tf.add_n([tf.nn.l2_loss(v) for v in variables])
 
                     # compute gradient
                     grad = tape.gradient(loss_miniBatch+ beta*w_norm +lamb*h_norm, variables)
                     gnorm = tf.global_norm(grad)
                     grad, _ = tf.clip_by_global_norm(grad, clipping, gnorm)
                     tfs.scalar("norms/grad", gnorm)
-                    tfs.scalar("norms/h_norm", h_norm)
-                    tfs.scalar("norms/w_norm", w_norm)
+                    tfs.scalar("norms/penal. on encoder representation", lamb*h_norm)
+                    tfs.scalar("norms/penal. on weights", beta*w_norm)
 
                     # apply optimizer on gradient
                     optimizer.apply_gradients(zip(grad, variables), global_step=tf.train.get_or_create_global_step())

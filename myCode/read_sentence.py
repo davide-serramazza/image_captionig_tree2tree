@@ -114,7 +114,6 @@ def label_tree_with_sentenceTree(train_data, val_data, base_path):
 
 
 def label_final_trees_with_data(tokenizer, train_data, val_data):
-    #TODO troppo lento
     for data in train_data + val_data:
         caption_trees = []
         for el in data['sentence_trees']:
