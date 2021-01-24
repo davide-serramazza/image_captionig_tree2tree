@@ -159,5 +159,4 @@ class NIC_Decoder(tf.keras.Model):
             predicted_sents = update_matrix(predictions, predicted_sents, ax=1)
 
             last_predicted_words = self.embedding_layer(tf.argmax(predictions, axis=2))
-            a=2
         return predicted_sents
