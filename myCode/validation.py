@@ -50,14 +50,14 @@ def main():
     ###################
     # tree definition
     ###################
-    tree_enoder = os.path.isfile(args.train)
-    cnn_type = args.CNN_to_use if tree_enoder else None
-    image_tree = ImageTree(cnn_type) if tree_enoder else None
+    tree_encoder = os.path.isfile(args.train)
+    cnn_type = args.CNN_to_use if tree_encoder else None
+    image_tree = ImageTree(cnn_type) if tree_encoder else None
     tree_decoder = os.path.isdir(args.targets)
     sentence_tree = SentenceTree() if tree_decoder else None
-    train_data, val_data, val_all_captions = load_data(args,tree_enoder,tree_decoder,cnn_type)
+    train_data, val_data, val_all_captions = load_data(args, tree_encoder, tree_decoder, cnn_type)
 
-    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data)
+    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data,tree_encoder)
 
     activation = getattr(tf.nn, FLAGS.activation)
     decoder, encoder = get_encoder_decoder(emb_tree_size=args.emb_tree_size,cut_arity=cut_arity,max_arity=
@@ -67,6 +67,7 @@ def main():
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
+    print("begin train")
     train_model(FLAGS=FLAGS,decoder=decoder,
                 encoder=encoder,train_data=train_data, val_data=val_data ,optimizer=optimizer,
                 beta=args.beta,lamb=lambd,clipping=clipping,batch_size=batch_size,

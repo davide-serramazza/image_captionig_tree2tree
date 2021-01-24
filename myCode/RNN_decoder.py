@@ -1,5 +1,6 @@
 import tensorflow as tf
 from myCode.word_processing import update_matrix
+from myCode.shared_POS_words_lists import word_idx
 #TODO unica attention
 
 class BahdanauAttention(tf.keras.Model):
@@ -108,3 +109,55 @@ class RNN_Decoder(tf.keras.Model):
                     to_return.append(el)
 
         return to_return
+
+
+
+
+class NIC_Decoder(tf.keras.Model):
+    def __init__(self, embedding_dim, vocab_size):
+        super(NIC_Decoder, self).__init__()
+
+        self.voab_size=vocab_size
+        self.embedding_layer = tf.keras.layers.Embedding(vocab_size, embedding_dim)
+        self.rnn = tf.keras.layers.LSTM(vocab_size,return_sequences=True,return_state=True)
+        self.final_layer = tf.keras.layers.Dense(vocab_size)
+
+    def call(self, inputs,roots,targets_padded_sentences):
+        #TODO posso eliminare l'argmax da qui e non genrare proprio vettore one-hot
+        embeddings = self.embedding_layer(targets_padded_sentences)
+        assert (roots.shape[-1] == embeddings.shape[-1]), "embedding dimensions must be the same"
+        #concatenate roots to zeros #TODO provare a radopppiarla?
+        #TODO in caso cambiare anche in sampling!!!!!!!!!!!
+        roots = tf.concat([roots,tf.zeros(shape=roots.shape)],axis=-1)
+        roots = tf.expand_dims(roots, axis=1)
+
+        inputs = tf.concat([embeddings,inputs],axis=-1)
+        inputs = tf.concat([roots, inputs], axis=1)
+        intial_state = [tf.zeros(shape=(targets_padded_sentences.shape[0],self.voab_size))]*2
+        rnn_out,state_h,state_c= self.rnn(inputs,initial_state=intial_state)
+        predictions = self.final_layer(rnn_out[:,1:,:])
+        return predictions
+
+
+    def sampling(self,inputs,roots):
+
+        predicted_sent = None
+        #TODO seguire eventuali cambiamenti che faccio in call!!!!!!!!!!!
+        inputs= tf.concat([tf.zeros(shape=(inputs.shape[0],1,inputs.shape[2])),inputs],axis=1)
+        last_analized_words = tf.expand_dims(roots, axis=1)
+        # concatenate in the proper way, parent embedding and root embedding
+        max_sentences_len = inputs.shape[1]
+        state = [tf.zeros(shape=(inputs.shape[0],self.voab_size))]*2
+        for i in range(0, max_sentences_len):
+            # fed the i-th input to the rnn, save its status and upadate embeggins to use at iteration (i+1)-th
+            #TODO forse più efficeinte usare tf.slide o qualcosa di simile?
+            current_input = inputs[:, i, :]
+            current_input = tf.expand_dims(current_input, axis=1)
+            current_input = tf.concat([last_analized_words,current_input], axis=-1)
+            rnn_out, state_h, state_c = self.rnn(current_input, initial_state=state)
+            state = [state_h, state_c]
+            predictions = self.final_layer(rnn_out)
+            if i!=0:
+                predicted_sent = update_matrix(predictions, predicted_sent, ax=1)
+            last_analized_words = self.embedding_layer(tf.argmax(predictions, axis=2))
+        return predicted_sent

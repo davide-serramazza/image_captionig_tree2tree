@@ -78,20 +78,21 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
     #take sentences length
     sentences_len = get_sentences_length(batch_idxs,TR)
     #prepare data (reshape as expected)
-    inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time)
+    inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR)
     if TR:
         #if training or teacher forcing
-        predictions = teacher_forcing(word_module,inputs, targets_padded_sentences,roots_emb,
-                                      root_only_in_fist_LSTM_time,keep_rate)
+        #predictions = teacher_forcing(word_module,inputs, targets_padded_sentences,roots_emb,
+        #                              root_only_in_fist_LSTM_time,keep_rate)
+        predictions = word_module(inputs,roots_emb,targets_padded_sentences)
     else:
         #otherwise sampling
-        predictions = sampling(word_module,inputs, roots_emb,root_only_in_fist_LSTM_time)
+        predictions = word_module.sampling(inputs, roots_emb)
     #unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort)
     return vals
 
 #TODO handle root in each time stamp
-def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
+def zip_data(inp, sentences_len, targets,TR):
     """
     function to get data in format expected by RNN i.e. (n_senteces)*(sen_max_lenght)*(representation_size)
     :param inp:  input as 2D matrix
@@ -113,8 +114,6 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
 
         # take nodes belonging to current sentence, pad them to max sentences length and concatenate them all together
         current_sen =inp[current_node:current_node+el]
-        if not root_only_in_fist_LSTM_time:
-            sys.exit("to implement")
 
         padding = tf.constant([[0, (max_len - el)], [0, 0]])
         current_sen = tf.pad(current_sen, padding, 'CONSTANT')
@@ -125,12 +124,12 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
             current_target = []
             for item in targets[current_node:(current_node + el)]:
                 # take as target all words in current sentence except the last one (it will be never use as target)
-                target_reshaped = tf.expand_dims(tf.expand_dims(tf.one_hot(item,WordValue.representation_shape),axis=0),axis=0)
-                current_target.append(target_reshaped)
+                current_target.append(item)
             # as before pad the sentence to max length, then concatenate with other ones
-            current_target = tf.concat([item for item in current_target], axis=1)
-            padding = tf.constant([[0, 0], [0, (max_len - el)], [0, 0]])
+            current_target = tf.concat([item for item in current_target], axis=0)
+            padding = tf.constant([[0, (max_len - el)]])
             current_target = tf.pad(current_target, padding, 'CONSTANT')
+            current_target = tf.expand_dims(current_target,axis=0)
             targets_padded_sentences = update_matrix(current_target,targets_padded_sentences,ax=0)
         #in any case update current node pointer
         current_node+=el
@@ -200,16 +199,13 @@ def sampling(word_module, inputs, roots,roots_conc_mode):
 ######################
 #NIC code
 ######################
-def teacher_forcing_NIC(embedding_layer, final_layer, inputs, rnn, roots, roots_conc_mode, targets_padded_sentences):
+def teacher_forcing_NIC(word_module, inputs, roots, targets_padded_sentences):
     embeddings = embedding_layer(tf.argmax(targets_padded_sentences, axis=2))
-    if roots_conc_mode:
-        assert (roots.shape[-1] == embeddings.shape[-1]), "embedding dimensions must be the same"
-        roots = tf.expand_dims(roots, axis=1)
-        embeddings = tf.concat([roots, embeddings], axis=1)
-        padding = tf.constant([[0, 0], [1, 0], [0, 0]])
-        inputs = tf.pad(inputs, padding)
-    else:
-        sys.exit("to implement")
+    assert (roots.shape[-1] == embeddings.shape[-1]), "embedding dimensions must be the same"
+    roots = tf.expand_dims(roots, axis=1)
+    embeddings = tf.concat([roots, embeddings], axis=1)
+    padding = tf.constant([[0, 0], [1, 0], [0, 0]])
+    inputs = tf.pad(inputs, padding)
     rnn_input = tf.concat([inputs, embeddings], axis=2)
     rnn_out, state_h, state_c = rnn(rnn_input)
     predictions = final_layer(rnn_out)

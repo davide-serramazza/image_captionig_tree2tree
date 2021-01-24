@@ -36,7 +36,7 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
             #shuffle data
             random.shuffle(train_data)
             #TODO da migliorare i passaggi di argomenti a get_sentence e get_image
-            input_train,input_val = get_image_batch(train_data,val_data,False)
+            input_train,input_val = get_image_batch(train_data,val_data,tree_encoder)
             target_train, target_val = get_sentence_batch(train_data,val_data,True, "a")
             len_input = len(input_train) if type(input_train)==list else input_train.shape[0]
             #input_train,target_train = shuffle_data(input_train,target_train,len_input)

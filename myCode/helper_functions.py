@@ -11,17 +11,17 @@ import myCode.shared_POS_words_lists as shared_list
 ######################
 #functions to extract all the image trees and all the sentence trees
 
-def get_image_batch(train_data,val_data,flat_encoder):
-    def f(data,flat_encoder):
+def get_image_batch(train_data,val_data,tree_encoder):
+    def f(data,tree_encoder):
         to_return = []
         for el in data:
-            if flat_encoder:
-                to_return.append(el["img"])
-            else:
+            if tree_encoder:
                 to_return.append(el["img_tree"])
+            else:
+                to_return=el["img"] if to_return==[] else tf.concat([to_return,el["img"]],axis=0)
         return to_return
 
-    return f(train_data,flat_encoder), f(val_data,flat_encoder)
+    return f(train_data,tree_encoder), f(val_data,tree_encoder)
 
 def read_sentences_from_file(arg2,train_data,val_data):
     def foo(arg2,data):
@@ -247,13 +247,14 @@ def extract_words_from_tree(trees):
     return to_return
 
 
-def compute_max_arity(train_data, val_data):
+def compute_max_arity(train_data, val_data,tree_encoder):
     img_max_arity=0
     sen_max_arity=0
     for el in train_data+val_data:
-        current_img_arity = get_tree_arity(el['img_tree'])
-        if current_img_arity>img_max_arity:
-            img_max_arity=current_img_arity
+        if tree_encoder:
+            current_img_arity = get_tree_arity(el['img_tree'])
+            if current_img_arity>img_max_arity:
+                img_max_arity=current_img_arity
         for caption in el['sentence_trees']:
             current_sen_arity = get_tree_arity(caption)
             if current_sen_arity>sen_max_arity:

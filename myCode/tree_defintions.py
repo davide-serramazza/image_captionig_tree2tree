@@ -107,7 +107,7 @@ class TagValue(NodeDefinition.Value):
     def representation_to_abstract_batch(t:tf.Tensor):
         s=shared_list
         idx = t[0].numpy()
-        if type(idx)==np.int32:
+        if type(idx)==np.uint8:
             try:
                 ris = shared_list.idx_tag[idx]
             except IndexError:
@@ -151,7 +151,7 @@ class WordValue(NodeDefinition.Value):
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
         idx = t[0].numpy()
-        if type(idx)==np.int32:
+        if type(idx)==np.uint16:
             try:
                 ris = shared_list.idx_word[idx]
             except IndexError:
