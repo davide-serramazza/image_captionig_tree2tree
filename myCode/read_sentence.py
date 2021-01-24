@@ -134,8 +134,8 @@ def extraxt_topK_words(word_occ,filters):
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters=filters,lower=True)
     tokenizer.fit_on_texts(word_occ)
     # word number with 5 or more occurrebcy in training
-    tokenizer.word_index['<start>'] = 0
-    tokenizer.index_word[0] = '<start>'
+    tokenizer.word_index['<pad>'] = 0
+    tokenizer.index_word[0] = '<pad>'
     shared_list.word_idx = tokenizer.word_index
     shared_list.idx_word = tokenizer.index_word
     WordValue.update_rep_shape(len(tokenizer.word_index.keys()))
