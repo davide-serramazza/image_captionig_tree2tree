@@ -140,8 +140,7 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                     tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
                     tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
                 else:
-                    pred_sentences= decoder.sampling(batch_val_enc,wi=shared_list.word_idx,
-                                                     iw=shared_list.idx_word,max_length=int(target_val.shape[1]))
+                    pred_sentences= decoder.sampling(batch_val_enc, )
 
                 bleu_1 = corpus_bleu(val_all_captions,pred_sentences,weights=(1.0,))
                 bleu_2 = corpus_bleu(val_all_captions,pred_sentences,weights=(0.5,0.5))

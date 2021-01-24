@@ -81,11 +81,12 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
     inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time)
     if TR:
         #if training or teacher forcing
-        predictions = teacher_forcing(word_module,inputs, targets_padded_sentences,roots_emb,
-                                      root_only_in_fist_LSTM_time,keep_rate)
+        #predictions = (word_module,inputs, targets_padded_sentences,roots_emb,
+        #                              root_only_in_fist_LSTM_time,keep_rate)
+        predictions = word_module(targets_padded_sentences,roots_emb,inputs)
     else:
         #otherwise sampling
-        predictions = sampling(word_module,inputs, roots_emb,root_only_in_fist_LSTM_time)
+        predictions = word_module.sampling(roots_emb, inputs)
     #unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort)
     return vals
@@ -191,7 +192,7 @@ def sampling(word_module, inputs, roots,roots_conc_mode):
     :param roots:
     :return:
     """
-    sentences = word_module.sampling(roots,shared_list.word_idx,shared_list.idx_word,inputs.shape[1],parents=inputs)
+    sentences = word_module.sampling(roots, shared_list.word_idx)
     #sentences = sampling_NIC(embedding, final_layer, inputs, rnn, roots, roots_conc_mode)
     return sentences
 

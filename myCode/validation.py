@@ -67,6 +67,7 @@ def main():
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
+    print("begin train")
     train_model(FLAGS=FLAGS,decoder=decoder,
                 encoder=encoder,train_data=train_data, val_data=val_data ,optimizer=optimizer,
                 beta=args.beta,lamb=lambd,clipping=clipping,batch_size=batch_size,
