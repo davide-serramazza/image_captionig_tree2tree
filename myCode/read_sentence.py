@@ -69,7 +69,7 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
         except:
             idx = 0
         final_tree.node_type_id="POS_tag"
-        final_tree.value=TagValue(representation=tf.constant(idx))
+        final_tree.value=TagValue(representation=tf.constant(idx,dtype=tf.uint8))
         final_tree.children = []
         for child in xml_tree.getchildren():
             final_tree.children.append(Tree(node_type_id="tmp"))
@@ -78,7 +78,7 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
         #check if in tag found in dev set otherwise label as others (last dimension)
         idx = tokenizer.texts_to_sequences([value])
         final_tree.node_type_id="word"
-        final_tree.value=WordValue(representation=tf.constant(idx[0][0],shape=(1)))
+        final_tree.value=WordValue(representation=tf.constant(idx[0][0],shape=(1),dtype=tf.uint16))
 
 
     #RECURSION
@@ -124,7 +124,7 @@ def label_final_trees_with_data(tokenizer, train_data, val_data):
                 caption_trees.append(final_tree)
             else:
                 idx = shared_list.tag_idx["S"]
-                tag = TagValue(representation=tf.constant(idx))
+                tag = TagValue(representation=tf.constant(idx,dtype=tf.uint8))
                 S_node = Tree(node_type_id="POS_tag", children=[final_tree], value=tag)
                 caption_trees.append(S_node)
         data['sentence_trees'] = caption_trees

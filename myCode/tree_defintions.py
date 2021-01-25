@@ -106,7 +106,7 @@ class TagValue(NodeDefinition.Value):
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
         idx = t[0].numpy()
-        if type(idx)==np.int32:
+        if type(idx)==np.uint8:
             ris = shared_list.idx_tag[idx]
         elif type(idx)==np.ndarray:
             ris= shared_list.idx_tag[np.argmax(idx)]
@@ -146,10 +146,12 @@ class WordValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        if t.shape==(1,1) and t.dtype==tf.int32:
+        if t.shape==(1,1) and t.dtype==tf.uint16:
+            # target
             idx = t[0][0].numpy()
             ris = shared_list.idx_word[idx]
         elif t.shape==(1,WordValue.representation_shape) and t.dtype==tf.float32:
+            # generated
             idx = tf.argmax(t[0],axis=-1).numpy()
             ris= shared_list.idx_word[idx]
         else:
