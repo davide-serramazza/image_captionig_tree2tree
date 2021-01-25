@@ -130,7 +130,7 @@ class NIC_Decoder(tf.keras.Model):
         #TODO non passare one-hot vec ma direttamente indice utilizzare dtype=tf.uint16/8 e shape=(1)
         #TODO capire anche discrso di rnn_unts (usare debugger per capire cosa istanzia la LSTM)
         # from targets can discard last ones (no other words to predict after the last ones)
-        word_embs = self.embedding(tf.argmax(targets[:,:-1,:],axis=-1))
+        word_embs = self.embedding(targets[:,:-1])
 
         # concatenate image embedding as first time stamp
         images_emb = tf.expand_dims(images_emb,axis=1)

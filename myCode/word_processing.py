@@ -126,12 +126,11 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
             current_target = []
             for item in targets[current_node:(current_node + el)]:
                 # take as target all words in current sentence except the last one (it will be never use as target)
-                target_reshaped = tf.expand_dims(tf.expand_dims(tf.one_hot(item,WordValue.representation_shape),axis=0),axis=0)
-                current_target.append(target_reshaped)
+                current_target.append(item)
             # as before pad the sentence to max length, then concatenate with other ones
-            current_target = tf.concat([item for item in current_target], axis=1)
-            padding = tf.constant([[0, 0], [0, (max_len - el)], [0, 0]])
-            current_target = tf.pad(current_target, padding, 'CONSTANT')
+            current_target = tf.concat([item for item in current_target], axis=-1)
+            padding = tf.constant([[0, (max_len - el)]])
+            current_target = tf.expand_dims(tf.pad(current_target, padding, 'CONSTANT'),axis=0)
             targets_padded_sentences = update_matrix(current_target,targets_padded_sentences,ax=0)
         #in any case update current node pointer
         current_node+=el

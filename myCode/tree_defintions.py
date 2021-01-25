@@ -105,18 +105,14 @@ class TagValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        s=shared_list
         idx = t[0].numpy()
         if type(idx)==np.int32:
-            try:
-                ris = shared_list.idx_tag[idx]
-            except IndexError:
-                ris = "not_found"
-            return ris
+            ris = shared_list.idx_tag[idx]
         elif type(idx)==np.ndarray:
-            return shared_list.idx_tag[np.argmax(idx)]
+            ris= shared_list.idx_tag[np.argmax(idx)]
         else:
             raise ValueError ("tag value of unknown type")
+        return ris
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -150,17 +146,15 @@ class WordValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        idx = t[0].numpy()
-        if type(idx)==np.int32:
-            try:
-                ris = shared_list.idx_word[idx]
-            except IndexError:
-                ris = ""
-            return ris
-        elif type(idx)==np.ndarray:
-            return shared_list.idx_word[np.argmax(idx)]
+        if t.shape==(1,1) and t.dtype==tf.int32:
+            idx = t[0][0].numpy()
+            ris = shared_list.idx_word[idx]
+        elif t.shape==(1,WordValue.representation_shape) and t.dtype==tf.float32:
+            idx = tf.argmax(t[0],axis=-1).numpy()
+            ris= shared_list.idx_word[idx]
         else:
             raise ValueError ("word value of unknown type")
+        return ris
 
     @staticmethod
     def abstract_to_representation_batch(v):
