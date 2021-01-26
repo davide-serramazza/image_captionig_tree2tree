@@ -26,7 +26,7 @@ def main():
     max_node_count = 100
     max_depth =  10
     cut_arity = 4
-    lambd= 0.001
+    lambd= 0.000
     parser.add_argument('beta', type=float, help="coefficient for L2 reg.")
     parser.add_argument('hidden_coeff', type=float, help="coefficient for hidden dimension of encoder and decoder layer")
     learning_rate = 0.001
