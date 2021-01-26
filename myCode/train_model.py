@@ -9,7 +9,7 @@ from myCode.helper_functions import extract_words_from_tree, get_image_batch, ge
 
 def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                 optimizer, beta,lamb,clipping,batch_size,val_all_captions,
-                tree_encoder, tree_decoder, final=False):
+                tree_encoder, tree_decoder, tensorboard_name):
 
     best_n_it = 0
     best_loss = 100
@@ -17,13 +17,10 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
     best_matched_pos=0
     best_struct=0
     best_bleu=0
-    if final:
-        FLAGS.max_iter = 2000
-        FLAGS.check_every = 10
 
     #tensorboard
     #TODO cambiare nome in parametri che sto usando
-    summary_writer = tfs.create_file_writer(FLAGS.model_dir+"/a" , flush_millis=1000)
+    summary_writer = tfs.create_file_writer(FLAGS.model_dir+tensorboard_name , flush_millis=1000)
     summary_writer.set_as_default()
 
     with tfs.always_record_summaries():

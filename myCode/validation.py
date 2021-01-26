@@ -67,11 +67,13 @@ def main():
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
     print("begin train")
+    name = "emb_dim_"+str(args.emb_tree_word_size)+"_rnn_units_"+str(args.rnn_unit_size)+"_lambda_."+str(args.lambd)[2:]+ \
+        " _beta_."+str(args.beta)[2:]+"_hidden_coeff_."+str(args.hidden_coeff)[2:]
     train_model(FLAGS=FLAGS,decoder=decoder,
                 encoder=encoder,train_data=train_data, val_data=val_data ,optimizer=optimizer,
                 beta=args.beta,lamb=args.lambd,clipping=clipping,batch_size=batch_size,
-                tree_encoder =not(image_tree==None), tree_decoder = not(sentence_tree==None),final=False,
-                val_all_captions=val_all_captions)
+                tree_encoder =not(image_tree==None), tree_decoder = not(sentence_tree==None),
+                val_all_captions=val_all_captions, tensorboard_name=name)
 
 
 if __name__ == "__main__":
