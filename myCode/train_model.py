@@ -80,8 +80,8 @@ def train_model(FLAGS, decoder, encoder, train_data, val_data ,
                     gnorm = tf.global_norm(grad)
                     grad, _ = tf.clip_by_global_norm(grad, clipping, gnorm)
                     tfs.scalar("norms/grad", gnorm)
-                    tfs.scalar("norms/penal. on encoder representation", lamb*h_norm)
-                    tfs.scalar("norms/penal. on weights", beta*w_norm)
+                    tfs.scalar("norms/encoder rep.", h_norm)
+                    tfs.scalar("norms/weights", w_norm)
 
                     # apply optimizer on gradient
                     optimizer.apply_gradients(zip(grad, variables), global_step=tf.train.get_or_create_global_step())
