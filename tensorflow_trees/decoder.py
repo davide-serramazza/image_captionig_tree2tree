@@ -150,7 +150,6 @@ class DecoderCellsBuilder:
         return f
 
 
-
 class Decoder(tf.keras.Model):
 
     def __init__(self, *,
@@ -333,6 +332,7 @@ class Decoder(tf.keras.Model):
                 else:
                     vals = words_predictions(self.word_module,batch_idxs,
                         inp,targets,TR, img_embs, self.root_only_in_fist_LSTM_time,perm2usort,keep_rate = self.keep_rate,n_it=n_it)
+                    #vals = tf.random.uniform(shape=(inp.shape[0],WordValue.representation_shape))
                     #if current nodes are words, "unsort matrix contaning it i.e. go back to order expected
                     #by following code
 

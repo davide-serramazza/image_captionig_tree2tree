@@ -13,7 +13,7 @@ def extract_occ(train_data):
         for caption in example['sentence_trees']:
             count_word_tag_occ(caption, word_occ)
     TagValue.update_rep_shape(len(shared_list.tag_idx))
-    return [k for k,v in word_occ.items() if v > 5]
+    return [k for k,v in word_occ.items() if v > 10]
 
 def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
     """
