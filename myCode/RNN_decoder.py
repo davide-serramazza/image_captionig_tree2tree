@@ -107,3 +107,61 @@ class RNN_Decoder(tf.keras.Model):
                     to_return.append(el)
 
         return to_return
+
+
+
+class NIC_Decoder(tf.keras.Model):
+    def __init__(self,embedding_dim, units, vocab_size):
+        super(NIC_Decoder,self).__init__()
+        self.embedding_layer = tf.keras.layers.Embedding(input_dim=vocab_size,output_dim=embedding_dim, name="embedding")
+        self.rnn =tf.keras.layers.LSTM(units=units, return_state=True, return_sequences=True, name="LSTM")
+        self.final_layer = tf.keras.layers.Dense(vocab_size, activation="linear",
+                                                 name="final_word_pred_layer")
+        self.units = units
+
+
+    def call(self,pos_embs, images_emb, targets):
+
+        #TODO non passare one-hot vec ma direttamente indice utilizzare dtype=tf.uint16/8 e shape=(1)
+        #TODO capire anche discrso di rnn_unts (usare debugger per capire cosa istanzia la LSTM)
+        # from targets can discard last ones (no other words to predict after the last ones)
+        word_embs = self.embedding_layer(targets[:,:-1])
+
+        # concatenate image embedding as first time stamp
+        images_emb = tf.expand_dims(images_emb,axis=1)
+        word_embs = tf.concat([images_emb,word_embs],axis=1)
+
+        # concatenate also pos tag as inputs in addition to the previous ones
+        rnn_input = tf.concat([word_embs,pos_embs],axis=-1)
+
+        # call LSTM
+        states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
+        rnn_output,state_h,state_c= self.rnn(rnn_input)#, initial_state = states)
+
+        #get predictions from last layer
+        predictions = self.final_layer(rnn_output)
+
+        return predictions
+
+    def sampling(self,features,pos_embs):
+
+        states = [tf.zeros(shape=(pos_embs.shape[0], self.units))] * 2
+        max_length = pos_embs.shape[1]
+        to_return=[]
+
+        #sampling of all word in parallel
+        for i in range(max_length):
+            if i==0:
+                current_word_embs = tf.expand_dims(features, axis=1)
+            else:
+                current_word_embs= self.embedding_layer(tf.argmax(predictions, axis=-1))
+            current_pos_embs = tf.expand_dims (pos_embs[:, i, :], axis=1)
+            rnn_inputs = tf.concat([current_word_embs, current_pos_embs], axis=-1)
+            rnn_output,states_h,state_c = self.rnn(rnn_inputs, initial_state = states)
+            states=[states_h,state_c]
+
+            predictions=self.final_layer(rnn_output)
+            to_return.append(predictions)
+
+        to_return = tf.concat([item for item in to_return],axis=1)
+        return to_return

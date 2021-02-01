@@ -183,6 +183,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 #else:
                 #    break
 
+# TODO spostare in RNN_Decoder ed importarla in validation
 def loss_function(real, pred):
     mask = tf.math.logical_not(tf.math.equal(tf.argmax(real,axis=-1), 0))
     loss_ = tf.nn.softmax_cross_entropy_with_logits_v2(labels=real, logits=pred)

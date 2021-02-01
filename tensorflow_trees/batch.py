@@ -212,7 +212,7 @@ class BatchOfTreesForDecoding(BatchOfTrees):
                 all_value_gen = tf.gather(self['vals_' + k], value[k])
 
                 if vt.class_value:
-                    vk_loss = tf.nn.softmax_cross_entropy_with_logits_v2(
+                    vk_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
                         labels=all_value_gt,
                         logits=all_value_gen)
                 else:

@@ -6,8 +6,7 @@ from tensorflow_trees.batch import BatchOfTreesForDecoding
 from tensorflow_trees.decoder_cells import GatedFixedArityNodeDecoder, ParallelDense
 from myCode.word_processing import *
 from myCode.tree_defintions import WordValue
-from myCode.RNN_decoder import RNN_Decoder
-from myCode.word_processing import NIC_Decoder
+from myCode.RNN_decoder import NIC_Decoder
 
 class DecoderCellsBuilder:
     """ Define interfaces and simple implementations for a cells builder, factory used for the decoder modules.
