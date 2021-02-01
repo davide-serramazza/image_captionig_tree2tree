@@ -1,5 +1,4 @@
 import tensorflow as tf
-from myCode.word_processing import update_matrix
 #TODO unica attention
 
 class BahdanauAttention(tf.keras.Model):
@@ -77,7 +76,7 @@ class RNN_Decoder(tf.keras.Model):
 
         hidden = self.reset_state(batch_size=features.shape[0])
         dec_input = tf.expand_dims([wi['<start>']] * features.shape[0], 1)
-        to_return=None
+        to_return=[]
         #prepare result array
         result =[]
         for i in range(int(features.shape[0])):
@@ -95,7 +94,7 @@ class RNN_Decoder(tf.keras.Model):
                 for j in range(len(predicted_ids)):
                     result[j].append(iw[predicted_ids[j]])
             else:
-                to_return=update_matrix(tf.expand_dims(predictions,axis=1),to_return,ax=1)
+                to_return.append(tf.expand_dims(predictions,axis=1))
 
         if parents==None:
             #extract pred sentence up to <end> token

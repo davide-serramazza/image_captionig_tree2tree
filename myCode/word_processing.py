@@ -81,11 +81,10 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
     inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time)
     if TR:
         #if training or teacher forcing
-        predictions = teacher_forcing(word_module,inputs, targets_padded_sentences,roots_emb,
-                                      root_only_in_fist_LSTM_time,keep_rate)
+        predictions =word_module.call(inputs, roots_emb,targets_padded_sentences)
     else:
         #otherwise sampling
-        predictions = sampling(word_module,inputs, roots_emb,root_only_in_fist_LSTM_time)
+        predictions =  word_module.sampling(roots_emb,inputs)
     #unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort)
     return vals
@@ -103,8 +102,8 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
     :return:
     """
     max_len = np.amax(sentences_len)
-    padded_input = None
-    targets_padded_sentences = None
+    padded_input = []
+    targets_padded_sentences = []
     current_node = 0
     current_tree=0
     # reshape as (n_senteces)*(sen_max_lenght)*(representation_size)
@@ -118,23 +117,23 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
 
         padding = tf.constant([[0, (max_len - el)], [0, 0]])
         current_sen = tf.pad(current_sen, padding, 'CONSTANT')
-        current_sen = tf.expand_dims(current_sen,axis=0)
-        padded_input = update_matrix(current_sen, padded_input,ax=0)
+        padded_input.append(current_sen)
         if TR:
             # targets only if available i.e. if we are in TR
-            current_target = []
+            current_targets = []
             for item in targets[current_node:(current_node + el)]:
                 # take as target all words in current sentence except the last one (it will be never use as target)
-                target_reshaped = tf.expand_dims(tf.expand_dims(item,axis=0),axis=0)
-                current_target.append(target_reshaped)
+                current_targets.append(item)
             # as before pad the sentence to max length, then concatenate with other ones
-            current_target = tf.concat([item for item in current_target], axis=1)
-            padding = tf.constant([[0, 0], [0, (max_len - el)], [0, 0]])
-            current_target = tf.pad(current_target, padding, 'CONSTANT')
-            targets_padded_sentences = update_matrix(current_target,targets_padded_sentences,ax=0)
+            current_targets = tf.convert_to_tensor(current_targets)
+            padding = tf.constant( [ [0, (max_len - el)], [0, 0] ] )
+            current_targets = tf.pad(current_targets, padding, 'CONSTANT')
+            targets_padded_sentences.append(current_targets)
         #in any case update current node pointer
         current_node+=el
         current_tree+=1
+    padded_input = tf.convert_to_tensor(padded_input)
+    targets_padded_sentences = tf.convert_to_tensor(targets_padded_sentences)
     assert current_node == np.sum(sentences_len)
     return padded_input, targets_padded_sentences
 
@@ -147,52 +146,15 @@ def unzip_data(predictions,sentences_len,perm2unsort):
     :param perm2unsort:
     :return:
     """
-    vals = None
+    vals = []
     for i in range (len(sentences_len)):
         current_sen_padded =predictions[i]
         current_sen = current_sen_padded[0:sentences_len[i]]
-        vals = update_matrix(current_sen,vals,ax=0)
+        vals.append(current_sen)
+    vals = tf.concat([item for item in vals],axis=0)
     vals = tf.gather(vals, perm2unsort)
     assert np.sum(sentences_len) == vals.shape[0]
     return vals
-
-def teacher_forcing(word_module, inputs, targets_padded_sentences,roots,roots_conc_mode,keep_rate):
-    """
-    function to use at training time i.e. techaer forcing
-    :param embedding:
-    :param rnn:
-    :param final_layer:
-    :param inputs:
-    :param targets_padded_sentences:
-    :param roots:
-    :return:
-    """
-    predictions = word_module.call(inputs, roots,targets_padded_sentences)
-
-    #hidden = word_module.reset_state(batch_size=inputs.shape[0])
-    #dec_input = tf.expand_dims([shared_list.word_idx['<start>']] * inputs.shape[0], 1)
-    #predictions = None
-    #for i in range(inputs.shape[1]):
-    #    current_pred,hidden = word_module.call(dec_input,roots,hidden,parents = tf.expand_dims (inputs[:,i,:],axis=1),keep_rate=keep_rate)
-    #    dec_input = tf.expand_dims( tf.argmax(targets_padded_sentences[:,i,:],axis=-1) , axis=1)
-    #    predictions = update_matrix(tf.expand_dims(current_pred,axis=1),predictions,ax=1)
-    return predictions
-
-
-
-def sampling(word_module, inputs, roots,roots_conc_mode):
-    """
-    function performing sampling i.e. compute i-th word and feed it as (i+1)-th rnn hidden state to rnn
-    :param embedding:
-    :param rnn:
-    :param final_layer:
-    :param inputs:
-    :param roots:
-    :return:
-    """
-    #sentences = word_module.sampling(roots,shared_list.word_idx,shared_list.idx_word,inputs.shape[1],parents=inputs)
-    sentences = word_module.sampling(roots,inputs)
-    return sentences
 
 
 
@@ -259,19 +221,6 @@ class NIC_Decoder(tf.keras.Model):
 #######################
 #helper functions
 ######################
-
-def update_matrix(current, total, ax):
-    """
-    function that concatenate current matrix in total matrix, in axis ax
-    :param current: tensor to add
-    :param total: final tensor to return
-    :return:
-    """
-    if total == None:
-        total = current
-    else:
-        total = tf.concat([total, current], axis=ax)
-    return total
 
 def inv(perm):
     """
