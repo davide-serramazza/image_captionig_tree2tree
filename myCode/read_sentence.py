@@ -57,7 +57,7 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
             # in this case tag is unkown (0) that is not found in train values
             idx = 0
         final_tree.node_type_id="POS_tag"
-        final_tree.value=TagValue(representation=tf.one_hot(idx, TagValue.representation_shape))
+        final_tree.value=TagValue(representation=tf.constant(idx))
         final_tree.children = []
         for child in xml_tree.getchildren():
             final_tree.children.append(Tree(node_type_id="fake "))
@@ -66,7 +66,7 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
         #check if in tag found in dev set otherwise label as others (last dimension)
         idx = tokenizer.texts_to_sequences([value])
         final_tree.node_type_id="word"
-        final_tree.value=WordValue(representation=tf.one_hot(idx[0][0], WordValue.representation_shape))
+        final_tree.value=WordValue(representation=tf.constant(idx[0][0]))
         for child in xml_tree.getchildren():
             final_tree.children.append(Tree(node_type_id="fake "))
 
@@ -110,7 +110,7 @@ def label_tree_with_sentenceTree(dev_data, tes_data, base_path):
             data['sentence_tree'] = final_tree
         else:
             idx = shared_list.tags_idx["S"]
-            tag=TagValue(representation=tf.one_hot(idx, TagValue.representation_shape))
+            tag=TagValue(representation=tf.constant(idx))
             S_node =Tree(node_type_id="POS_tag",children=[final_tree],value=tag)
             data['sentence_tree'] = S_node
 

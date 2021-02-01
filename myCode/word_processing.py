@@ -126,7 +126,7 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
                 current_targets.append(item)
             # as before pad the sentence to max length, then concatenate with other ones
             current_targets = tf.convert_to_tensor(current_targets)
-            padding = tf.constant( [ [0, (max_len - el)], [0, 0] ] )
+            padding = tf.constant( [ [0, (max_len - el)] ] )
             current_targets = tf.pad(current_targets, padding, 'CONSTANT')
             targets_padded_sentences.append(current_targets)
         #in any case update current node pointer
@@ -176,8 +176,7 @@ class NIC_Decoder(tf.keras.Model):
         #TODO non passare one-hot vec ma direttamente indice utilizzare dtype=tf.uint16/8 e shape=(1)
         #TODO capire anche discrso di rnn_unts (usare debugger per capire cosa istanzia la LSTM)
         # from targets can discard last ones (no other words to predict after the last ones)
-        indexes = tf.argmax(targets,axis=-1)
-        word_embs = self.embedding_layer(indexes[:,:-1])
+        word_embs = self.embedding_layer(targets[:,:-1])
 
         # concatenate image embedding as first time stamp
         images_emb = tf.expand_dims(images_emb,axis=1)

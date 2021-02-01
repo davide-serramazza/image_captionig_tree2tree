@@ -104,9 +104,15 @@ class TagValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        idx = tf.argmax(t[0]).numpy()
-        ris = shared_list.idx_tags[idx]
-        return ris
+        if t.shape==(1,):
+            # target
+            idx = (t[0]).numpy()
+        elif t.shape==(1,TagValue.representation_shape):
+            # generated
+            idx = tf.argmax(t[0]).numpy()
+        else:
+            raise ValueError("Word of unknown shape")
+        return shared_list.idx_tags[idx]
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -119,7 +125,7 @@ class TagValue(NodeDefinition.Value):
         for el in v:
             idx = shared_list.tags_idx[el]
             ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
-        return ris
+        return tf.convert_to_tensor(ris)
 
 class WordValue(NodeDefinition.Value):
     """
@@ -139,12 +145,15 @@ class WordValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        idx = tf.argmax(t[0]).numpy()
-        try:
-            ris = shared_list.idx_word[idx]
-        except IndexError:
-            ris = ""
-        return ris
+        if t.shape==(1,):
+            # target
+            idx = (t[0]).numpy()
+        elif t.shape==(1,WordValue.representation_shape):
+            # generated
+            idx = tf.argmax(t[0]).numpy()
+        else:
+            raise ValueError("Word of unknown shape")
+        return shared_list.idx_word[idx]
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -158,7 +167,7 @@ class WordValue(NodeDefinition.Value):
         for el in v:
             idx = shared_list.word_idx[el]
             ris.append( tf.one_hot(idx,WordValue.representation_shape) )
-        return ris
+        return tf.convert_to_tensor(ris)
         #else:
         #    idx = shared_list.word_idx.index(v)
         #    return tf.one_hot(idx,WordValue.representation_shape)
