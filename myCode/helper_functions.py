@@ -89,8 +89,8 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type):
     print('loading sentence trees...')
     if tree_decoder:
         label_tree_with_sentenceTree(train_data,val_data, args.targets)
-    val_all_captions = load_all_captions(args.all_captions,val_data)
-    return train_data,val_data,val_all_captions
+    flat_val_caption = load_all_captions(args.all_captions,val_data)
+    return train_data,val_data,flat_val_caption
 
 def load_all_data(args,):
     print('loading image trees....')
