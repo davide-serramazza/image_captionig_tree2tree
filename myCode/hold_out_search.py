@@ -49,8 +49,6 @@ def main():
     train_data, val_data, val_all_captions = load_data(args,tree_enoder,tree_decoder,cnn_type)
     print(len(train_data),len(val_data),len(val_all_captions)   )
     # get batch for traning
-    input_train,input_val = get_image_batch(train_data,val_data,image_tree==None)
-    target_train, target_val = get_sentence_batch(train_data,val_data,tree_decoder,args.targets)
 
     # define parameters to search:
     parameters = []
@@ -70,7 +68,7 @@ def main():
 
     #tree_decoder
     print("begin experiments")
-    validation(input_train, target_train,input_val, target_val, parameters, FLAGS, image_tree,
+    validation(train_data,val_data, parameters, FLAGS, image_tree,
                sentence_tree,name="to_report/flat",val_all_captions=val_all_captions)
 
 

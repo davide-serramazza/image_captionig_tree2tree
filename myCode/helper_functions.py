@@ -245,19 +245,25 @@ def extract_words_from_tree(trees):
     return to_return
 
 
-def compute_max_arity(input_train, input_tree, target_train, target_tree):
-    if input_tree != None:
-        train_image_max_arity = max_arity(input_train)
-        val_image_max_arity = 0
-        image_max_arity = max(train_image_max_arity, val_image_max_arity)
-    else:
-        image_max_arity = 0
-        input_train = tf.Variable(input_train)
-        input_train = tf.squeeze(input_train)
-    if target_tree != None:
-        train_sen_max_arity = max_arity(target_train)
-        val_sen_max_arity = 10
-        sen_max_arity = max(train_sen_max_arity, val_sen_max_arity)
-    else:
-        sen_max_arity = 0
-    return image_max_arity, input_train, sen_max_arity
+def compute_max_arity(train_data,val_data):
+    image_max_arity=0
+    sen_max_arity=0
+    for el in train_data+val_data:
+        current_img_arity=get_tree_arity(el['img_tree'])
+        if current_img_arity>image_max_arity:
+            image_max_arity=current_img_arity
+
+        #TODO quando messe le altre caption iterare su di esse
+        caption = el['sentence_tree']
+        current_sen_arity=get_tree_arity(caption)
+        if current_sen_arity>sen_max_arity:
+            sen_max_arity=current_sen_arity
+    return image_max_arity, sen_max_arity
+
+def get_input_target(data):
+    images=[]
+    captions=[]
+    for el in data:
+        images.append(el['img_tree'])
+        captions.append(el['sentence_tree'])
+    return images,captions

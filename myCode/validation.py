@@ -1,6 +1,6 @@
 import tensorflow.contrib.eager as tfe
 import tensorflow.contrib.summary as tfs
-from myCode.helper_functions import max_arity,shuffle_data,extract_words_from_tree, compute_max_arity
+from myCode.helper_functions import max_arity,shuffle_data,extract_words_from_tree, compute_max_arity, get_input_target
 from myCode.models import *
 from  myCode.helper_functions import select_one_in_range
 from tensorflow_trees.definition import Tree
@@ -10,7 +10,7 @@ from nltk.translate.bleu_score import corpus_bleu
 import myCode.shared_POS_words_lists as shared_list
 from tensorflow.python.keras import backend as K
 
-def train_model(FLAGS, decoder, encoder, input_train, target_train,input_val, target_val,
+def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,lamb,clipping,batch_size,n_exp, name,val_all_captions,
                 tree_encoder, tree_decoder, final=False, keep_rate=1.0, test=None):
 
@@ -36,6 +36,8 @@ def train_model(FLAGS, decoder, encoder, input_train, target_train,input_val, ta
             loss_word = 0
 
             #shuffle dataset at beginning of each iteration
+            input_train,target_train = get_input_target(train_data)
+            input_val,target_val =  get_input_target(val_data)
             len_input = len(input_train) if type(input_train)==list else input_train.shape[0]
             #input_train,target_train = shuffle_data(input_train,target_train,len_input)
             for j in range(0,len_input,batch_size):
@@ -195,13 +197,13 @@ def loss_function(real, pred):
     return tf.reduce_mean(loss_)
 
 
-def validation(input_train, target_train ,input_val, target_val,parameters, FLAGS,input_tree, target_tree, name: str,val_all_captions,test=None) :
+def validation(train_data,val_data,parameters, FLAGS,input_tree, target_tree, name: str,val_all_captions,test=None) :
 
     #open file
 #    f= open(name+".txt","ab", buffering=0)
 
     #compute max_arity
-    image_max_arity, input_train, sen_max_arity = compute_max_arity(input_train, input_tree, target_train, target_tree)
+    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data)
 
     #selected actual parameter to try
     i=0
@@ -236,8 +238,7 @@ def validation(input_train, target_train ,input_val, target_val,parameters, FLAG
 
                 matched_word_uns,matched_pos_uns, s_avg, bleu, best_n_it= train_model(FLAGS=FLAGS,decoder=decoder,
                     encoder=encoder,
-                    input_train=input_train,target_train=target_train,
-                    input_val=input_val, target_val=target_val,optimizer=optimizer,
+                    train_data=train_data,val_data=val_data,optimizer=optimizer,
                     beta=beta,lamb=lamb,clipping=clipping,batch_size=batch_size,n_exp=i,name=name,
                     tree_encoder =not(input_tree==None), tree_decoder = not(target_tree==None),final=False,
                     val_all_captions=val_all_captions,keep_rate=keep_rate)
