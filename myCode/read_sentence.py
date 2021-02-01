@@ -17,12 +17,12 @@ def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
     #if current word is a tag
     elif sen_tree.tag == "node":
         if (value not in shared_list.tags_idx) and (value!="ROOT"):
-            shared_list.tags_idx.append(value)
-
+            idx=len(shared_list.tags_idx)
+            shared_list.tags_idx[value]=idx
+            shared_list.idx_tags[idx]=value
     #recursion
     for child in sen_tree.getchildren():
         count_word_tag_occ(child, words_occ)
-
 
 def read_tree_from_file(file):
     """
@@ -52,11 +52,12 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
     if xml_tree.tag == "node" and value!="ROOT":
         #check if in frequent word in dev set otherwise label as others (last dimension)
         try:
-            idx = shared_list.tags_idx.index(value)
-        except:
-            idx = len(shared_list.tags_idx)-1
+            idx = shared_list.tags_idx[value]
+        except KeyError:
+            # in this case tag is unkown (0) that is not found in train values
+            idx = 0
         final_tree.node_type_id="POS_tag"
-        final_tree.value=TagValue(representation=tf.one_hot(idx, len(shared_list.tags_idx)))
+        final_tree.value=TagValue(representation=tf.one_hot(idx, TagValue.representation_shape))
         final_tree.children = []
         for child in xml_tree.getchildren():
             final_tree.children.append(Tree(node_type_id="fake "))
@@ -97,8 +98,8 @@ def label_tree_with_sentenceTree(dev_data, tes_data, base_path):
     word_occ = []
     for data in dev_data:
         count_word_tag_occ(data['sentence_tree'], word_occ)
-    tokenizer,_ = extraxt_topK_words(word_occ,filters="~")
     TagValue.update_rep_shape(len(shared_list.tags_idx))
+    tokenizer,_ = extraxt_topK_words(word_occ,filters="~")
 
     #label tree with real data
     for data in dev_data+tes_data:
@@ -108,8 +109,8 @@ def label_tree_with_sentenceTree(dev_data, tes_data, base_path):
         if final_tree.value.abstract_value=="S":
             data['sentence_tree'] = final_tree
         else:
-            idx = shared_list.tags_idx.index("S")
-            tag=TagValue(representation=tf.one_hot(idx, len(shared_list.tags_idx)))
+            idx = shared_list.tags_idx["S"]
+            tag=TagValue(representation=tf.one_hot(idx, TagValue.representation_shape))
             S_node =Tree(node_type_id="POS_tag",children=[final_tree],value=tag)
             data['sentence_tree'] = S_node
 
@@ -123,24 +124,9 @@ def extraxt_topK_words(word_occ,filters):
     print(top_k)
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters=filters)
     tokenizer.fit_on_texts(word_occ)
-    tokenizer.word_index['<start>'] = 0
-    tokenizer.index_word[0] = '<start>'
+    tokenizer.word_index['<pad>'] = 0
+    tokenizer.index_word[0] = '<pad>'
     shared_list.word_idx = tokenizer.word_index
     shared_list.idx_word = tokenizer.index_word
     WordValue.update_rep_shape(top_k)
     return tokenizer,top_k
-
-
-"""
-def read_tree_from_file(file,embeddings,dictionary,name):
-
-    #open file
-    tree = ET.parse(file)
-    root = tree.getroot()
-    #dummy root
-    dummy = Tree(node_type_id="dummy",children=[],value="dummy")
-    #get tree really read the tree
-    get_tree(dummy, root, dictionary, embeddings,name)
-    #return child of dummy root i.e. the real root
-    return dummy.children[0]
-"""
