@@ -124,7 +124,7 @@ class TagValue(NodeDefinition.Value):
         ris=[]
         for el in v:
             idx = shared_list.tags_idx[el]
-            ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
+            ris.append( tf.constant(idx ) )
         return tf.convert_to_tensor(ris)
 
 class WordValue(NodeDefinition.Value):
@@ -166,7 +166,7 @@ class WordValue(NodeDefinition.Value):
         ris=[]
         for el in v:
             idx = shared_list.word_idx[el]
-            ris.append( tf.one_hot(idx,WordValue.representation_shape) )
+            ris.append( tf.constant(idx) )
         return tf.convert_to_tensor(ris)
         #else:
         #    idx = shared_list.word_idx.index(v)
