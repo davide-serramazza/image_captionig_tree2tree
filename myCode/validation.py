@@ -9,6 +9,7 @@ import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
 import myCode.shared_POS_words_lists as shared_list
 from tensorflow.python.keras import backend as K
+from random import shuffle
 
 def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,lamb,clipping,batch_size,n_exp, name,val_all_captions,
@@ -36,6 +37,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             loss_word = 0
 
             #shuffle dataset at beginning of each iteration
+            shuffle(train_data)
             input_train,target_train = get_input_target(train_data)
             input_val,target_val =  get_input_target(val_data)
             len_input = len(input_train) if type(input_train)==list else input_train.shape[0]
