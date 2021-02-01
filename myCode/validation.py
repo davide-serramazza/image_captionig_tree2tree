@@ -91,6 +91,9 @@ def train_model(FLAGS, decoder, encoder, input_train, target_train,input_val, ta
                     # apply optimizer on gradient
                     optimizer.apply_gradients(zip(grad, variables), global_step=tf.train.get_or_create_global_step())
 
+                tf.reset_default_graph()
+                tf.keras.backend.clear_session()
+                tf.set_random_seed(1)
 
             loss_struct /= (int(int(len_input)/batch_size)+1)
             loss_value /= (int(int(len_input)/batch_size)+1)

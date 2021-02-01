@@ -135,7 +135,7 @@ def define_flags():
 
     tf.flags.DEFINE_integer(
         "check_every",
-        default=10,
+        default=5,
         help="How often (iterations) to check performances")
 
     tf.flags.DEFINE_integer(
