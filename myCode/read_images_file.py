@@ -11,6 +11,7 @@ def read_images(imgs_dir_file,cnn,tree_cnn_type):
     :return:
     """
     data = []
+
     if cnn==None:
         #open file and read lines
         f= open(imgs_dir_file,"r")
@@ -49,7 +50,7 @@ def read_images(imgs_dir_file,cnn,tree_cnn_type):
             img = tf.keras.applications.inception_v3.preprocess_input(img)
             img = tf.expand_dims(img,axis=0)
             batch_features = cnn(img)
-            batch_features = tf.reshape(batch_features,(batch_features.shape[0], -1, batch_features.shape[3]))
+            batch_features =  tf.reshape(batch_features,(batch_features.shape[0], -1, batch_features.shape[3]))
             img = None
             data.append({"name" : name, "img":batch_features})
     return data

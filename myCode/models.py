@@ -2,7 +2,7 @@ from tensorflow_trees.decoder import Decoder, DecoderCellsBuilder
 from tensorflow_trees.encoder import Encoder, EncoderCellsBuilder
 from myCode.tree_defintions import WordValue
 from myCode.CNN_encoder import CNN_Encoder
-from myCode.RNN_decoder import BahdanauAttention,RNN_Decoder
+from myCode.RNN_decoder import BahdanauAttention, BahdanauAttention,RNN_Decoder
 
 # cut_arity è il numero di nodi che vengono passati direttamente all'encodder flat, se = n l'input n+1 è
 # l'attention applicata a tutti gli altri i   nput
@@ -14,7 +14,7 @@ from myCode.RNN_decoder import BahdanauAttention,RNN_Decoder
 
 
 def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_node_count, max_depth, hidden_coeff,
-                        activation,emb_word_size,image_tree, sentence_tree,keep_rate):
+                        activation,emb_word_size,image_tree, sentence_tree):
 
     if image_tree==None:
         encoder = CNN_Encoder(emb_tree_size)
@@ -33,9 +33,9 @@ def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_nod
         decoder = RNN_Decoder(emb_word_size,hidden_word,WordValue.representation_shape)
     else:
         attention = BahdanauAttention(hidden_word) if image_tree==None else None
-        decoder = Decoder(tree_def=sentence_tree.tree_def, embedding_size=emb_tree_size, max_arity=20,max_depth=max_depth,
+        decoder = Decoder(tree_def=sentence_tree.tree_def, embedding_size=emb_tree_size, max_arity=max_arity,max_depth=max_depth,
                           max_node_count=max_node_count, cut_arity=cut_arity, variable_arity_strategy="FLAT",
-                hidden_word=hidden_word, attention=attention, keep_rate=keep_rate,
+                hidden_word=hidden_word, attention=attention,
 
                 cellsbuilder=DecoderCellsBuilder(distrib_builder=DecoderCellsBuilder.simple_distrib_cell_builder(
                     hidden_coef=hidden_coeff,activation=activation),

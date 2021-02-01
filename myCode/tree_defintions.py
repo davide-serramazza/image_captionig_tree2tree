@@ -1,7 +1,6 @@
 from tensorflow_trees.definition import TreeDefinition, NodeDefinition
 import tensorflow as tf
 import myCode.shared_POS_words_lists as shared_list
-import numpy as np
 import sys
 
 ###########
@@ -105,13 +104,11 @@ class TagValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        idx = t[0].numpy()
-        if type(idx)==np.uint8:
-            ris = shared_list.idx_tag[idx]
-        elif type(idx)==np.ndarray:
-            ris= shared_list.idx_tag[np.argmax(idx)]
-        else:
-            raise ValueError ("tag value of unknown type")
+        idx = tf.argmax(t[0])
+        try:
+            ris = shared_list.tags_idx[idx]
+        except IndexError:
+            ris = "not_found"
         return ris
 
     @staticmethod
@@ -121,18 +118,21 @@ class TagValue(NodeDefinition.Value):
         :param v:
         :return:
         """
-        ris=[]
-        for el in v:
-            idx = shared_list.tag_idx[el]
-            ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
-        return ris
-
+        if type(v)==list:
+            ris=[]
+            for el in v:
+                idx = shared_list.tags_idx.index(el)
+                ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
+            return ris
+        else:
+            idx = shared_list.tags_idx.index(v)
+            return  tf.one_hot(idx,TagValue.representation_shape)
 
 class WordValue(NodeDefinition.Value):
     """
     class modelling word value i.e. emebedding vector
     """
-    representation_shape = 1    #word number in dataset
+    representation_shape = 0    #word number in dataset
     embedding_size=0    #embedding dimension
     class_value = True
 
@@ -146,16 +146,11 @@ class WordValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        if t.shape==(1,1) and t.dtype==tf.uint16:
-            # target
-            idx = t[0][0].numpy()
+        idx = tf.argmax(t[0]).numpy()
+        try:
             ris = shared_list.idx_word[idx]
-        elif t.shape==(1,WordValue.representation_shape) and t.dtype==tf.float32:
-            # generated
-            idx = tf.argmax(t[0],axis=-1).numpy()
-            ris= shared_list.idx_word[idx]
-        else:
-            raise ValueError ("word value of unknown type")
+        except IndexError:
+            ris = ""
         return ris
 
     @staticmethod
@@ -165,12 +160,15 @@ class WordValue(NodeDefinition.Value):
         :param v:
         :return:
         """
+        #if type(v)==list:
         ris=[]
         for el in v:
             idx = shared_list.word_idx[el]
             ris.append( tf.one_hot(idx,WordValue.representation_shape) )
         return ris
-
+        #else:
+        #    idx = shared_list.word_idx.index(v)
+        #    return tf.one_hot(idx,WordValue.representation_shape)
 
 class SentenceTree:
     """

@@ -81,12 +81,11 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
     inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time)
     if TR:
         #if training or teacher forcing
-        #predictions = (word_module,inputs, targets_padded_sentences,roots_emb,
-        #                              root_only_in_fist_LSTM_time,keep_rate)
-        predictions = word_module(targets_padded_sentences,roots_emb,inputs)
+        predictions = teacher_forcing(word_module,inputs, targets_padded_sentences,roots_emb,
+                                      root_only_in_fist_LSTM_time,keep_rate)
     else:
         #otherwise sampling
-        predictions = word_module.sampling(roots_emb, inputs)
+        predictions = sampling(word_module,inputs, roots_emb,root_only_in_fist_LSTM_time)
     #unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort)
     return vals
@@ -126,11 +125,12 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
             current_target = []
             for item in targets[current_node:(current_node + el)]:
                 # take as target all words in current sentence except the last one (it will be never use as target)
-                current_target.append(item)
+                target_reshaped = tf.expand_dims(tf.expand_dims(item,axis=0),axis=0)
+                current_target.append(target_reshaped)
             # as before pad the sentence to max length, then concatenate with other ones
-            current_target = tf.concat([item for item in current_target], axis=-1)
-            padding = tf.constant([[0, (max_len - el)]])
-            current_target = tf.expand_dims(tf.pad(current_target, padding, 'CONSTANT'),axis=0)
+            current_target = tf.concat([item for item in current_target], axis=1)
+            padding = tf.constant([[0, 0], [0, (max_len - el)], [0, 0]])
+            current_target = tf.pad(current_target, padding, 'CONSTANT')
             targets_padded_sentences = update_matrix(current_target,targets_padded_sentences,ax=0)
         #in any case update current node pointer
         current_node+=el
@@ -167,16 +167,15 @@ def teacher_forcing(word_module, inputs, targets_padded_sentences,roots,roots_co
     :param roots:
     :return:
     """
-    #predictions = teacher_forcing_NIC(word_module, inputs, rnn, roots, roots_conc_mode,
-    #                                  targets_padded_sentences)
+    predictions = word_module.call(inputs, roots,targets_padded_sentences)
 
-    hidden = word_module.reset_state(batch_size=inputs.shape[0])
-    dec_input = tf.expand_dims([shared_list.word_idx['<start>']] * inputs.shape[0], 1)
-    predictions = None
-    for i in range(inputs.shape[1]):
-        current_pred,hidden = word_module.call(dec_input,roots,hidden,parents = tf.expand_dims (inputs[:,i,:],axis=1),keep_rate=keep_rate)
-        dec_input = tf.expand_dims( tf.argmax(targets_padded_sentences[:,i,:],axis=-1) , axis=1)
-        predictions = update_matrix(tf.expand_dims(current_pred,axis=1),predictions,ax=1)
+    #hidden = word_module.reset_state(batch_size=inputs.shape[0])
+    #dec_input = tf.expand_dims([shared_list.word_idx['<start>']] * inputs.shape[0], 1)
+    #predictions = None
+    #for i in range(inputs.shape[1]):
+    #    current_pred,hidden = word_module.call(dec_input,roots,hidden,parents = tf.expand_dims (inputs[:,i,:],axis=1),keep_rate=keep_rate)
+    #    dec_input = tf.expand_dims( tf.argmax(targets_padded_sentences[:,i,:],axis=-1) , axis=1)
+    #    predictions = update_matrix(tf.expand_dims(current_pred,axis=1),predictions,ax=1)
     return predictions
 
 
@@ -191,8 +190,8 @@ def sampling(word_module, inputs, roots,roots_conc_mode):
     :param roots:
     :return:
     """
-    sentences = word_module.sampling(roots, shared_list.word_idx)
-    #sentences = sampling_NIC(embedding, final_layer, inputs, rnn, roots, roots_conc_mode)
+    #sentences = word_module.sampling(roots,shared_list.word_idx,shared_list.idx_word,inputs.shape[1],parents=inputs)
+    sentences = word_module.sampling(roots,inputs)
     return sentences
 
 
@@ -200,44 +199,62 @@ def sampling(word_module, inputs, roots,roots_conc_mode):
 ######################
 #NIC code
 ######################
-def teacher_forcing_NIC(embedding_layer, final_layer, inputs, rnn, roots, roots_conc_mode, targets_padded_sentences):
-    embeddings = embedding_layer(tf.argmax(targets_padded_sentences, axis=2))
-    if roots_conc_mode:
-        assert (roots.shape[-1] == embeddings.shape[-1]), "embedding dimensions must be the same"
-        roots = tf.expand_dims(roots, axis=1)
-        embeddings = tf.concat([roots, embeddings], axis=1)
-        padding = tf.constant([[0, 0], [1, 0], [0, 0]])
-        inputs = tf.pad(inputs, padding)
-    else:
-        sys.exit("to implement")
-    rnn_input = tf.concat([inputs, embeddings], axis=2)
-    rnn_out, state_h, state_c = rnn(rnn_input)
-    predictions = final_layer(rnn_out)
-    return predictions
+class NIC_Decoder(tf.keras.Model):
+    def __init__(self,embedding_dim, units, vocab_size):
+        super(NIC_Decoder,self).__init__()
+        self.embedding_layer = tf.keras.layers.Embedding(input_dim=vocab_size,output_dim=embedding_dim, name="embedding")
+        self.rnn =tf.keras.layers.LSTM(units=units, return_state=True, return_sequences=True, name="LSTM")
+        self.final_layer = tf.keras.layers.Dense(vocab_size, activation="linear",
+                                     name="final_word_pred_layer")
+        self.units = units
 
-def sampling_NIC(embedding, final_layer, inputs, rnn, roots, roots_conc_mode):
-    sentences = None
-    # concatenate in the proper way, parent embedding and root embedding
-    if roots_conc_mode != None:
-        last_analized_words = tf.expand_dims(roots, axis=1)
-    else:
-        sys.exit("to implement")
-    max_sentences_len = inputs.shape[1]
-    for i in range(0, max_sentences_len):
-        # fed the i-th input to the rnn, save its status and upadate embeggins to use at iteration (i+1)-th
-        current_input = inputs[:, i, :]
-        current_input = tf.expand_dims(current_input, axis=1)
-        current_input = tf.concat([current_input, last_analized_words], axis=2)
-        if i == 0:
-            rnn_out, state_h, state_c = rnn(current_input)
-            state = [state_h, state_c]
-        else:
-            rnn_out, state_h, state_c = rnn(current_input, initial_state=state)
-            state = [state_h, state_c]
-        predictions = final_layer(rnn_out)
-        sentences = update_matrix(predictions, sentences, ax=1)
-        last_analized_words = embedding(tf.argmax(predictions, axis=2))
-    return sentences
+
+    def call(self,pos_embs, images_emb, targets):
+
+        #TODO non passare one-hot vec ma direttamente indice utilizzare dtype=tf.uint16/8 e shape=(1)
+        #TODO capire anche discrso di rnn_unts (usare debugger per capire cosa istanzia la LSTM)
+        # from targets can discard last ones (no other words to predict after the last ones)
+        indexes = tf.argmax(targets,axis=-1)
+        word_embs = self.embedding_layer(indexes[:,:-1])
+
+        # concatenate image embedding as first time stamp
+        images_emb = tf.expand_dims(images_emb,axis=1)
+        word_embs = tf.concat([images_emb,word_embs],axis=1)
+
+        # concatenate also pos tag as inputs in addition to the previous ones
+        rnn_input = tf.concat([word_embs,pos_embs],axis=-1)
+
+        # call LSTM
+        states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
+        rnn_output,state_h,state_c= self.rnn(rnn_input)#, initial_state = states)
+
+        #get predictions from last layer
+        predictions = self.final_layer(rnn_output)
+
+        return predictions
+
+    def sampling(self,features,pos_embs):
+
+        states = [tf.zeros(shape=(pos_embs.shape[0], self.units))] * 2
+        max_length = pos_embs.shape[1]
+        to_return=[]
+
+        #sampling of all word in parallel
+        for i in range(max_length):
+            if i==0:
+                current_word_embs = tf.expand_dims(features, axis=1)
+            else:
+                current_word_embs= self.embedding_layer(tf.argmax(predictions, axis=-1))
+            current_pos_embs = tf.expand_dims (pos_embs[:, i, :], axis=1)
+            rnn_inputs = tf.concat([current_word_embs, current_pos_embs], axis=-1)
+            rnn_output,states_h,state_c = self.rnn(rnn_inputs, initial_state = states)
+            states=[states_h,state_c]
+
+            predictions=self.final_layer(rnn_output)
+            to_return.append(predictions)
+
+        to_return = tf.concat([item for item in to_return],axis=1)
+        return to_return
 
 #######################
 #helper functions

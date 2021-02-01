@@ -5,9 +5,8 @@ from random import randrange, uniform
 from random import shuffle
 import numpy as np
 import json
-import random
+from myCode.tree_defintions import WordValue
 import myCode.shared_POS_words_lists as shared_list
-
 ######################
 #functions to extract all the image trees and all the sentence trees
 
@@ -37,7 +36,7 @@ def read_sentences_from_file(arg2,train_data,val_data):
 
     train_captions = foo(arg2,train_data)
     val_captions = foo(arg2,val_data)
-    tokenizer,top_k = extraxt_topK_words(train_captions,filters='!"#$%&()*+.,-/:;=?@[\]^_`{|}~ ')
+    tokenizer,top_k = extraxt_topK_words(train_captions,filters='~')
     tokenizer.word_index['<pad>'] = 0
     tokenizer.index_word[0] = '<pad>'
     targets_train = tokenizer.texts_to_sequences(train_captions)
@@ -52,7 +51,7 @@ def get_sentence_batch(train_data,val_data,tree_decoder,arg2):
     def f(data):
         to_return=[]
         for el in data:
-            to_return.append(random.choice(el['sentence_trees']))
+            to_return.append(el['sentence_tree'])
         return to_return
     if tree_decoder:
         return f(train_data), f(val_data)
@@ -89,25 +88,25 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type):
     val_data = read_images(args.val,image_features_extract_model,tree_cnn_type)
     print('loading sentence trees...')
     if tree_decoder:
-        label_tree_with_sentenceTree(train_data, val_data, args.targets)
+        label_tree_with_sentenceTree(train_data,val_data, args.targets)
     val_all_captions = load_all_captions(args.all_captions,val_data)
     return train_data,val_data,val_all_captions
 
-#def load_all_data(args,):
-    #print('loading image trees....')
-    #train_data = read_images(args[0])
-    #val_data = read_images(args[1])
-    #test_data = read_images(args[3])
-    #print('loading sentence trees...')
-    #label_tree_with_sentenceTree(train_data+val_data, test_data, args[2])
-#return train_data+val_data,test_data
+def load_all_data(args,):
+    print('loading image trees....')
+    train_data = read_images(args[0])
+    val_data = read_images(args[1])
+    test_data = read_images(args[3])
+    print('loading sentence trees...')
+    label_tree_with_sentenceTree(train_data+val_data, test_data, args[2])
+    return train_data+val_data,test_data
 
-#def laod_test_data(args,dictionary, embeddings):
-    #print('loading image trees....')
-    #test_data = read_images(args[0])
-    #print('loading sentence trees...')
-    #label_tree_with_sentenceTree(test_data,args[3],embeddings,dictionary)
-    #return test_data
+def laod_test_data(args,dictionary, embeddings):
+    print('loading image trees....')
+    test_data = read_images(args[0])
+    print('loading sentence trees...')
+    label_tree_with_sentenceTree(test_data,args[3],embeddings,dictionary)
+    return test_data
 
 #######################
 
@@ -198,7 +197,6 @@ def shuffle_data(input,target,len_input):
     return input_shuffled, target_shuffled
 
 def max_arity (list):
-    #TODO probabilmente da cancellare
     """
     funtion to get the msx_arity in data set
     :param list: list of tree(dataset)
@@ -247,19 +245,7 @@ def extract_words_from_tree(trees):
     return to_return
 
 
-def compute_max_arity(train_data, val_data):
-    img_max_arity=0
-    sen_max_arity=0
-    for el in train_data+val_data:
-        current_img_arity = get_tree_arity(el['img_tree'])
-        if current_img_arity>img_max_arity:
-            img_max_arity=current_img_arity
-        for caption in el['sentence_trees']:
-            current_sen_arity = get_tree_arity(caption)
-            if current_sen_arity>sen_max_arity:
-                sen_max_arity=current_sen_arity
-    return img_max_arity,sen_max_arity
-"""
+def compute_max_arity(input_train, input_tree, target_train, target_tree):
     if input_tree != None:
         train_image_max_arity = max_arity(input_train)
         val_image_max_arity = 0
@@ -275,4 +261,3 @@ def compute_max_arity(train_data, val_data):
     else:
         sen_max_arity = 0
     return image_max_arity, input_train, sen_max_arity
-"""
