@@ -117,10 +117,11 @@ def compute_max_arity(train_data,val_data):
                 sen_max_arity=current_sen_arity
     return image_max_arity, sen_max_arity
 
-def get_input_target(data):
+def get_input_target_minibatch(data,j,batch_size):
     images=[]
     captions=[]
-    for el in data:
+    for i in range( j,min( j+batch_size,len(data) ) ):
+        el = data[i]
         images.append(el['img_tree'])
         # choose a random caption
         caption = choice(el['sentences'])

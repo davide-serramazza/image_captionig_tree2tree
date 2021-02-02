@@ -1,6 +1,6 @@
 import tensorflow.contrib.eager as tfe
 import tensorflow.contrib.summary as tfs
-from myCode.helper_functions import extract_words_from_tree, get_input_target
+from myCode.helper_functions import extract_words_from_tree, get_input_target_minibatch
 from tensorflow_trees.definition import Tree
 import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
@@ -34,14 +34,12 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
             #shuffle dataset at beginning of each iteration
             shuffle(train_data)
-            input_train,target_train = get_input_target(train_data)
-            len_input = len(input_train) if type(input_train)==list else input_train.shape[0]
+            len_input = len(train_data) if type(train_data)==list else train_data.shape[0]
             #input_train,target_train = shuffle_data(input_train,target_train,len_input)
             for j in range(0,len_input,batch_size):
                 with tfe.GradientTape() as tape:
 
-                    current_batch_input=input_train[j:j+batch_size]
-                    current_batch_target = target_train[j:j+batch_size]
+                    current_batch_input, current_batch_target = get_input_target_minibatch(train_data,j,batch_size)
 
                     # encode and decode datas
                     batch_enc = encoder(current_batch_input)
@@ -82,6 +80,8 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     tfs.scalar("norms/grad", gnorm)
                     tfs.scalar("norms/penal. on encoder representation", lamb*h_norm)
                     tfs.scalar("norms/penal. on weights", beta*w_norm)
+                    del current_batch_target
+                    del current_batch_input
 
                     # apply optimizer on gradient
                     optimizer.apply_gradients(zip(grad, variables), global_step=tf.train.get_or_create_global_step())
@@ -89,7 +89,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     tf.reset_default_graph()
                     tf.keras.backend.clear_session()
                     tf.set_random_seed(1)
-            del target_train
+
             loss_struct /= (int(int(len_input)/batch_size)+1)
             loss_value /= (int(int(len_input)/batch_size)+1)
             loss_POS  /= (int(int(len_input)/batch_size)+1)
@@ -107,7 +107,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             if i % FLAGS.check_every == 0:
                 #var_to_save = encoder.variables+encoder.weights + decoder.variables+decoder.weights + optimizer.variables()
                 #tfe.Saver(var_to_save).save(checkpoint_prefix,global_step=tf.train.get_or_create_global_step())
-                input_val,target_val =  get_input_target(val_data)
+                input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data))
 
                 if not tree_encoder:
                     input_val = tf.Variable(input_val)
