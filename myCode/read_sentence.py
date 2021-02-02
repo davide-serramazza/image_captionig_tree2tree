@@ -101,22 +101,20 @@ def label_tree_with_sentenceTree(dev_data, tes_data, base_path):
         for el in data['sentences']:
             count_word_tag_occ(el, word_occ)
     TagValue.update_rep_shape(len(shared_list.tags_idx))
-    tokenizer,_ = extraxt_topK_words(word_occ,filters="~")
-
+    extraxt_topK_words(word_occ,filters="~")
+    del word_occ
 
 def extraxt_topK_words(word_occ,filters):
-    top_k = 50000
+    top_k = 10000000
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters='~')
     tokenizer.fit_on_texts(word_occ)
     # word number with 5 or more occurrebcy in training
-    top_k = len((list(filter(lambda el: el[1] >= 5, tokenizer.word_counts.items()))))
-    print(top_k)
+    words_list = (dict(filter(lambda el: el[1] >= 5, tokenizer.word_counts.items())))
+    top_k = len(words_list)
+    print("voab dim is ",top_k)
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters=filters)
-    tokenizer.fit_on_texts(word_occ)
+    tokenizer.fit_on_texts(words_list.keys())
     tokenizer.word_index['<pad>'] = 0
     tokenizer.index_word[0] = '<pad>'
-    shared_list.word_idx = tokenizer.word_index
-    shared_list.idx_word = tokenizer.index_word
     shared_list.tokenizer = tokenizer
     WordValue.update_rep_shape(top_k)
-    return tokenizer,top_k

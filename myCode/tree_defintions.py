@@ -153,7 +153,7 @@ class WordValue(NodeDefinition.Value):
             idx = tf.argmax(t[0]).numpy()
         else:
             raise ValueError("Word of unknown shape")
-        return shared_list.idx_word[idx]
+        return shared_list.tokenizer.index_word[idx]
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -165,12 +165,10 @@ class WordValue(NodeDefinition.Value):
         #if type(v)==list:
         ris=[]
         for el in v:
-            idx = shared_list.word_idx[el]
+            idx = shared_list.tokenizer.word_index[el]
             ris.append( tf.constant(idx) )
         return tf.convert_to_tensor(ris)
-        #else:
-        #    idx = shared_list.word_idx.index(v)
-        #    return tf.one_hot(idx,WordValue.representation_shape)
+
 
 class SentenceTree:
     """
