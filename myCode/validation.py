@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, '/home/davide/workspace/tesi/')
+sys.path.insert(0, '.')
 
 import argparse
 from myCode.helper_functions import compute_max_arity,define_flags,load_data
