@@ -54,7 +54,7 @@ def main():
     sentence_tree = SentenceTree() if tree_decoder else None
     train_data, val_data, flat_val_captions = load_data(args, tree_enoder, tree_decoder, cnn_type)
 
-    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data)
+    image_max_arity, sen_max_arity = 2,13#compute_max_arity(train_data, val_data)
 
     activation = getattr(tf.nn, FLAGS.activation)
     decoder, encoder = get_encoder_decoder(emb_tree_size=args.emb_tree_word_size,cut_arity=cut_arity,max_arity=

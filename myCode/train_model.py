@@ -89,7 +89,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     tf.reset_default_graph()
                     tf.keras.backend.clear_session()
                     tf.set_random_seed(1)
-
+            del target_train
             loss_struct /= (int(int(len_input)/batch_size)+1)
             loss_value /= (int(int(len_input)/batch_size)+1)
             loss_POS  /= (int(int(len_input)/batch_size)+1)
@@ -178,6 +178,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     best_loss=loss_validation
                 #else:
                 #    break
+                del target_val
 
 # TODO spostare in RNN_Decoder ed importarla in validation
 def loss_function(real, pred):

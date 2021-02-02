@@ -2,6 +2,8 @@ import xml.etree.ElementTree as ET
 from myCode.tree_defintions import *
 import tensorflow as tf
 from tensorflow_trees.definition import Tree
+from os import listdir
+from os.path import join
 
 def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
     """
@@ -34,10 +36,7 @@ def read_tree_from_file(file):
     :return:
     """
     #open file
-    try:
-    	tree = ET.parse(file+"/2")
-    except:
-        tree = ET.parse(file+"/3")
+    tree = ET.parse(file)
     return tree.getroot()
 
 
@@ -91,28 +90,18 @@ def label_tree_with_sentenceTree(dev_data, tes_data, base_path):
     for data in dev_data+tes_data:
         name = data['name']
         #after got file name, read tree from xml file
-        tree = read_tree_from_file(base_path+name)
-        data['sentence_tree'] = tree
+        captions = []
+        for el in listdir(join(base_path,name)):
+            captions.append( read_tree_from_file(join(base_path,name,el)) )
+        data['sentences'] = captions
 
     #count occurency of words
     word_occ = []
     for data in dev_data:
-        count_word_tag_occ(data['sentence_tree'], word_occ)
+        for el in data['sentences']:
+            count_word_tag_occ(el, word_occ)
     TagValue.update_rep_shape(len(shared_list.tags_idx))
     tokenizer,_ = extraxt_topK_words(word_occ,filters="~")
-
-    #label tree with real data
-    for data in dev_data+tes_data:
-        final_tree = Tree(node_type_id="dummy root", children=[],value="dummy")
-        label_tree_with_real_data(data['sentence_tree'], final_tree,tokenizer)
-        final_tree = final_tree.children[0]
-        if final_tree.value.abstract_value=="S":
-            data['sentence_tree'] = final_tree
-        else:
-            idx = shared_list.tags_idx["S"]
-            tag=TagValue(representation=tf.constant(idx))
-            S_node =Tree(node_type_id="POS_tag",children=[final_tree],value=tag)
-            data['sentence_tree'] = S_node
 
 
 def extraxt_topK_words(word_occ,filters):
@@ -128,5 +117,6 @@ def extraxt_topK_words(word_occ,filters):
     tokenizer.index_word[0] = '<pad>'
     shared_list.word_idx = tokenizer.word_index
     shared_list.idx_word = tokenizer.index_word
+    shared_list.tokenizer = tokenizer
     WordValue.update_rep_shape(top_k)
     return tokenizer,top_k

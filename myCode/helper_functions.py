@@ -1,7 +1,12 @@
 from myCode.read_images_file import read_images
-from myCode.read_sentence import label_tree_with_sentenceTree,extraxt_topK_words
+from myCode.read_sentence import label_tree_with_sentenceTree
 import tensorflow as tf
 import json
+from random import  choice
+from tensorflow_trees.definition import Tree
+from myCode.read_sentence import label_tree_with_real_data
+import myCode.shared_POS_words_lists as shared_list
+
 ######################
 
 def istanciate_CNN(tree_encoder):
@@ -106,10 +111,10 @@ def compute_max_arity(train_data,val_data):
             image_max_arity=current_img_arity
 
         #TODO quando messe le altre caption iterare su di esse
-        caption = el['sentence_tree']
-        current_sen_arity=get_tree_arity(caption)
-        if current_sen_arity>sen_max_arity:
-            sen_max_arity=current_sen_arity
+        for caption in el['sentence_trees']:
+            current_sen_arity=get_tree_arity(caption)
+            if current_sen_arity>sen_max_arity:
+                sen_max_arity=current_sen_arity
     return image_max_arity, sen_max_arity
 
 def get_input_target(data):
@@ -117,5 +122,12 @@ def get_input_target(data):
     captions=[]
     for el in data:
         images.append(el['img_tree'])
-        captions.append(el['sentence_tree'])
+        # choose a random caption
+        caption = choice(el['sentences'])
+
+        #build the tree now
+        sentence_tree = Tree(node_type_id="dummy root", children=[],value="dummy")
+        label_tree_with_real_data(caption, sentence_tree,shared_list.tokenizer)
+        captions.append( sentence_tree.children[0] )
+
     return images,captions
