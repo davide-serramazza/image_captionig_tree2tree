@@ -35,7 +35,6 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             #shuffle dataset at beginning of each iteration
             shuffle(train_data)
             input_train,target_train = get_input_target(train_data)
-            input_val,target_val =  get_input_target(val_data)
             len_input = len(input_train) if type(input_train)==list else input_train.shape[0]
             #input_train,target_train = shuffle_data(input_train,target_train,len_input)
             for j in range(0,len_input,batch_size):
@@ -73,20 +72,16 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     variables = encoder.variables + decoder.variables
 
                     #compute h and w norm for regularization
-                    h_norm= tf.norm(root_emb)
-                    w_norm=0
-                    for w in variables:
-                        norm = tf.norm(w)
-                        if norm >= 0.001:
-                            w_norm += norm
+                    h_norm= tf.norm(root_emb,ord=1)
+                    w_norm= tf.add_n([tf.nn.l2_loss(v) for v in variables])
 
                     # compute gradient
                     grad = tape.gradient(loss_miniBatch+ beta*w_norm +lamb*h_norm, variables)
                     gnorm = tf.global_norm(grad)
                     grad, _ = tf.clip_by_global_norm(grad, clipping, gnorm)
                     tfs.scalar("norms/grad", gnorm)
-                    tfs.scalar("norms/h_norm", h_norm)
-                    tfs.scalar("norms/w_norm", w_norm)
+                    tfs.scalar("norms/penal. on encoder representation", lamb*h_norm)
+                    tfs.scalar("norms/penal. on weights", beta*w_norm)
 
                     # apply optimizer on gradient
                     optimizer.apply_gradients(zip(grad, variables), global_step=tf.train.get_or_create_global_step())
@@ -112,6 +107,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             if i % FLAGS.check_every == 0:
                 #var_to_save = encoder.variables+encoder.weights + decoder.variables+decoder.weights + optimizer.variables()
                 #tfe.Saver(var_to_save).save(checkpoint_prefix,global_step=tf.train.get_or_create_global_step())
+                input_val,target_val =  get_input_target(val_data)
 
                 if not tree_encoder:
                     input_val = tf.Variable(input_val)
