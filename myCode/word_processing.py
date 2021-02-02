@@ -1,9 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from myCode.tree_defintions import WordValue
-import random
 import sys
-import myCode.shared_POS_words_lists as shared_list
 
 def get_ordered_nodes(embeddings, ops,TR, trees):
     """
