@@ -6,6 +6,8 @@ from random import  choice
 from tensorflow_trees.definition import Tree
 from myCode.read_sentence import label_tree_with_real_data
 import myCode.shared_POS_words_lists as shared_list
+import xml.etree.ElementTree as ET
+
 
 ######################
 
@@ -77,14 +79,21 @@ def define_flags():
         help="Directory to put the model summaries, parameters and checkpoint.")
 
 
-def get_tree_arity(t ):
+def get_image_arity(t ):
     max_arity = len(t.children)
     for child in t.children:
-        actual_arity = get_tree_arity(child)
+        actual_arity = get_image_arity(child)
         if actual_arity > max_arity:
             max_arity = actual_arity
     return max_arity
 
+def get_sen_arity(tree : ET.Element):
+    max_arity = len(tree.getchildren())
+    for el in tree.getchildren():
+        current_arity = get_sen_arity(el)
+        if current_arity > max_arity:
+            max_arity = current_arity
+    return max_arity
 
 def take_word_vectors(t ,l:list):
     if t.node_type_id=="word":
@@ -106,13 +115,12 @@ def compute_max_arity(train_data,val_data):
     image_max_arity=0
     sen_max_arity=0
     for el in train_data+val_data:
-        current_img_arity=get_tree_arity(el['img_tree'])
+        current_img_arity=get_image_arity(el['img_tree'])
         if current_img_arity>image_max_arity:
             image_max_arity=current_img_arity
 
-        #TODO quando messe le altre caption iterare su di esse
-        for caption in el['sentence_trees']:
-            current_sen_arity=get_tree_arity(caption)
+        for caption in el['sentences']:
+            current_sen_arity= get_sen_arity(caption)
             if current_sen_arity>sen_max_arity:
                 sen_max_arity=current_sen_arity
     return image_max_arity, sen_max_arity

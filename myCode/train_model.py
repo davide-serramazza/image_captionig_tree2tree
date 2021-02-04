@@ -11,11 +11,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,lamb,clipping,batch_size, flat_val_captions, tensorboard_name,
                 tree_encoder, tree_decoder, final=False, keep_rate=1.0):
 
-    best_n_it = 0
     best_loss = 100
-    best_matched_word=0
-    best_matched_pos=0
-    best_struct=0
     best_bleu=0
     if final:
         FLAGS.max_iter = 2000
@@ -78,17 +74,14 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     gnorm = tf.global_norm(grad)
                     grad, _ = tf.clip_by_global_norm(grad, clipping, gnorm)
                     tfs.scalar("norms/grad", gnorm)
-                    tfs.scalar("norms/penal. on encoder representation", lamb*h_norm)
-                    tfs.scalar("norms/penal. on weights", beta*w_norm)
+                    tfs.scalar("norms/hidden representation norm", h_norm)
+                    tfs.scalar("norms/square of weights norm", w_norm)
                     del current_batch_target
                     del current_batch_input
 
                     # apply optimizer on gradient
                     optimizer.apply_gradients(zip(grad, variables), global_step=tf.train.get_or_create_global_step())
 
-                    tf.reset_default_graph()
-                    tf.keras.backend.clear_session()
-                    tf.set_random_seed(1)
 
             loss_struct /= (int(int(len_input)/batch_size)+1)
             loss_value /= (int(int(len_input)/batch_size)+1)

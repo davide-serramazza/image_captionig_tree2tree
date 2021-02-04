@@ -109,12 +109,12 @@ def extraxt_topK_words(word_occ,filters):
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters='~')
     tokenizer.fit_on_texts(word_occ)
     # word number with 5 or more occurrebcy in training
-    words_list = (dict(filter(lambda el: el[1] >= 5, tokenizer.word_counts.items())))
+    words_list = (dict(filter(lambda el: el[1] >= 10, tokenizer.word_counts.items())))
     top_k = len(words_list)
-    print("voab dim is ",top_k)
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters=filters)
     tokenizer.fit_on_texts(words_list.keys())
     tokenizer.word_index['<pad>'] = 0
     tokenizer.index_word[0] = '<pad>'
+    print("voab dim is ",top_k)
     shared_list.tokenizer = tokenizer
     WordValue.update_rep_shape(top_k)

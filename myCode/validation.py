@@ -54,7 +54,8 @@ def main():
     sentence_tree = SentenceTree() if tree_decoder else None
     train_data, val_data, flat_val_captions = load_data(args, tree_enoder, tree_decoder, cnn_type)
 
-    image_max_arity, sen_max_arity = 2,13#compute_max_arity(train_data, val_data)
+    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data)
+    print(image_max_arity,sen_max_arity)
 
     activation = getattr(tf.nn, FLAGS.activation)
     decoder, encoder = get_encoder_decoder(emb_tree_size=args.emb_tree_word_size,cut_arity=cut_arity,max_arity=
@@ -65,8 +66,8 @@ def main():
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
     print("begin train")
-    name = "emb_dim_"+str(args.emb_tree_word_size)+"_rnn_units_"+str(args.rnn_unit_size)+"_lambda_."+str(args.lambd)[2:]+ \
-           " _beta_."+str(args.beta)[2:]+"_hidden_coeff_."+str(args.hidden_coeff)[2:]
+    name = "emb_dim_"+str(args.emb_tree_word_size)+"_rnn_units_"+str(args.rnn_unit_size)+"_lambda_"+str(args.lambd)[2:]+ \
+           " _beta_"+str(args.beta)[2:]+"_hidden_coeff_"+str(args.hidden_coeff)[2:]
     train_model(FLAGS=FLAGS, decoder=decoder,
                 encoder=encoder, train_data=train_data, val_data=val_data, optimizer=optimizer,
                 beta=args.beta, lamb=args.lambd, clipping=clipping, batch_size=batch_size,
