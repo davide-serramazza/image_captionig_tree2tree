@@ -60,7 +60,7 @@ def define_flags():
 
     tf.flags.DEFINE_integer(
         "max_iter",
-        default=61,
+        default=200,
         help="Maximum number of iteration to train")
 
     tf.flags.DEFINE_integer(
