@@ -136,7 +136,7 @@ class NIC_Decoder(tf.keras.Model):
 
         # call LSTM
         states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
-        rnn_output,state_h,state_c= self.rnn(rnn_input)#, initial_state = states)
+        rnn_output,state_h,state_c= self.rnn(rnn_input, initial_state = states)
 
         #get predictions from last layer
         predictions = self.final_layer(rnn_output)
