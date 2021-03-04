@@ -35,7 +35,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             for j in range(0,len_input,batch_size):
                 with tfe.GradientTape() as tape:
 
-                    current_batch_input, current_batch_target = get_input_target_minibatch(train_data,j,batch_size)
+                    current_batch_input, current_batch_target = get_input_target_minibatch(train_data,j,batch_size,tree_encoder)
 
                     # encode and decode datas
                     batch_enc = encoder(current_batch_input)
@@ -100,7 +100,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             if i % FLAGS.check_every == 0:
                 #var_to_save = encoder.variables+encoder.weights + decoder.variables+decoder.weights + optimizer.variables()
                 #tfe.Saver(var_to_save).save(checkpoint_prefix,global_step=tf.train.get_or_create_global_step())
-                input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data))
+                input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data),tree_encoder)
 
                 if not tree_encoder:
                     input_val = tf.Variable(input_val)

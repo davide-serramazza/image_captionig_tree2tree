@@ -34,11 +34,11 @@ def load_flat_captions(json_file,val_data):
             val_all_captions[-1].append( sentence.split(" ") )
     return val_all_captions
 
-def load_data(args,tree_encoder,tree_decoder,tree_cnn_type):
+def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
     print('loading image trees....')
     image_features_extract_model = istanciate_CNN(tree_encoder)
-    train_data = read_images(args.train,image_features_extract_model,tree_cnn_type)
-    val_data = read_images(args.val,image_features_extract_model,tree_cnn_type)
+    train_data = read_images(args.train,image_features_extract_model,tree_cnn_type,batch_size)
+    val_data = read_images(args.val,image_features_extract_model,tree_cnn_type,batch_size)
     print('loading sentence trees...')
     if tree_decoder:
         label_tree_with_sentenceTree(train_data,val_data, args.targets)
@@ -111,13 +111,14 @@ def extract_words_from_tree(trees):
     return to_return
 
 
-def compute_max_arity(train_data,val_data):
+def compute_max_arity(train_data,val_data,tree_encoder):
     image_max_arity=0
     sen_max_arity=0
     for el in train_data+val_data:
-        current_img_arity=get_image_arity(el['img_tree'])
-        if current_img_arity>image_max_arity:
-            image_max_arity=current_img_arity
+        if tree_encoder:
+            current_img_arity=get_image_arity(el['img_tree'])
+            if current_img_arity>image_max_arity:
+                image_max_arity=current_img_arity
 
         for caption in el['sentences']:
             current_sen_arity= get_sen_arity(caption)
@@ -125,12 +126,16 @@ def compute_max_arity(train_data,val_data):
                 sen_max_arity=current_sen_arity
     return image_max_arity, sen_max_arity
 
-def get_input_target_minibatch(data,j,batch_size):
+
+def get_input_target_minibatch(data,j,batch_size,tree_encoder):
     images=[]
     captions=[]
     for i in range( j,min( j+batch_size,len(data) ) ):
         el = data[i]
-        images.append(el['img_tree'])
+        if tree_encoder:
+            images.append(el['img_tree'])
+        else:
+            images.append(el['img'])
         # choose a random caption
         caption = choice(el['sentences'])
 
@@ -139,4 +144,6 @@ def get_input_target_minibatch(data,j,batch_size):
         label_tree_with_real_data(caption, sentence_tree,shared_list.tokenizer)
         captions.append( sentence_tree.children[0] )
 
+    if not tree_encoder:
+        images  = tf.convert_to_tensor(images)
     return images,captions

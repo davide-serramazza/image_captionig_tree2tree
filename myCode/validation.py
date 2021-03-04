@@ -52,9 +52,9 @@ def main():
     image_tree = ImageTree(cnn_type) if tree_enoder else None
     tree_decoder = os.path.isdir(args.targets)
     sentence_tree = SentenceTree() if tree_decoder else None
-    train_data, val_data, flat_val_captions = load_data(args, tree_enoder, tree_decoder, cnn_type)
+    train_data, val_data, flat_val_captions = load_data(args, tree_enoder, tree_decoder, cnn_type, batch_size)
 
-    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data)
+    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data,tree_enoder)
     print(image_max_arity,sen_max_arity)
 
     activation = getattr(tf.nn, FLAGS.activation)

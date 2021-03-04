@@ -235,9 +235,6 @@ class Decoder(tf.keras.Model):
             if encodings is None:
                 raise ValueError("Or batch or xs must be set")
             else:
-                img_embs = encodings
-                if self.attention!=None:
-                    encodings = self.attention(encodings,tf.zeros(shape=(encodings.shape[0],encodings.shape[2])))
                 batch = BatchOfTreesForDecoding(encodings, self.tree_def, targets)
         all_ops = {nt.id: [] for nt in self.all_types}
         TR = batch.target_trees is not None
