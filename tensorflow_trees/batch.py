@@ -220,7 +220,7 @@ class BatchOfTreesForDecoding(BatchOfTrees):
 
                 reduced = tf.reduce_mean(vk_loss, axis=-1)
 
-                tfs.scalar("loss/tr/values/"+k, reduced)
+                #tfs.scalar("loss/tr/values/"+k, reduced)
                 v_loss[k] = reduced   # TODO handle the mixing of losses from different domain (i.e. properly weight them)
 
         return d_loss, v_loss
