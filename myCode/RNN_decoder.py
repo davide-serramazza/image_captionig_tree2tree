@@ -132,7 +132,7 @@ class NIC_Decoder(tf.keras.Model):
         word_embs = tf.concat([images_emb,word_embs],axis=1)
 
         # concatenate also pos tag as inputs in addition to the previous ones
-        rnn_input = tf.concat([word_embs,pos_embs],axis=-1)
+        rnn_input = word_embs #tf.concat([word_embs,pos_embs],axis=-1)
 
         # call LSTM
         states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
@@ -156,7 +156,7 @@ class NIC_Decoder(tf.keras.Model):
             else:
                 current_word_embs= self.embedding_layer(tf.argmax(predictions, axis=-1))
             current_pos_embs = tf.expand_dims (pos_embs[:, i, :], axis=1)
-            rnn_inputs = tf.concat([current_word_embs, current_pos_embs], axis=-1)
+            rnn_inputs = current_word_embs #tf.concat([current_word_embs, current_pos_embs], axis=-1)
             rnn_output,states_h,state_c = self.rnn(rnn_inputs, initial_state = states)
             states=[states_h,state_c]
 
