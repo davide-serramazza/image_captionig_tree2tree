@@ -178,7 +178,7 @@ class Encoder(tf.keras.Model):
         else:
             return tf.tuple([inp, tf.zeros([inp.shape[0], 0])])
 
-    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]]) -> BatchOfTreesForEncoding:
+    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]],keep_prob_input=1.0,keep_prob=1.0) -> BatchOfTreesForEncoding:
 
         if not type(batch) == BatchOfTreesForEncoding:
             batch = BatchOfTreesForEncoding(batch, self.embedding_size)
@@ -222,8 +222,10 @@ class Encoder(tf.keras.Model):
 
             if op_t == 'E':
 
+                #TODO capire che voglio fare con root
                 inp = node_t.value_type.abstract_to_representation_batch([x.value.abstract_value for x in ops])
                 res = network.optimized_call(inp)
+                res = tf.nn.dropout(res,keep_prob=keep_prob_input)
 
                 #  superfluous when node is fused
                 if node_id not in self.tree_def.fusable_nodes_id_child_parent.keys():

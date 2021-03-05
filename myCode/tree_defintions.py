@@ -73,8 +73,6 @@ class ImageTree:
         elif tree_cnn_type=="inception":
             self.tree_def = TreeDefinition(node_types=[
                 NodeDefinition("root",may_root=True,arity=NodeDefinition.VariableArity(min_value=0),value_type=ImageValueInceptionRoot),
-                NodeDefinition("othersInternal",may_root=False,arity=NodeDefinition.VariableArity(min_value=5),value_type=ImageValueInception),
-                NodeDefinition("doubleInternal",may_root=False,arity=NodeDefinition.FixedArity(4),value_type=ImageValueInception),
                 NodeDefinition("internal",may_root=False,arity=NodeDefinition.FixedArity(2),value_type=ImageValueInception),
                 NodeDefinition("leaf",may_root=False,arity=NodeDefinition.FixedArity(0),value_type=ImageValueInception)
             ])
