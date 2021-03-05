@@ -159,7 +159,7 @@ class Encoder(tf.keras.Model):
 
     def _c_fixed_op(self, inp, ops, network):
 
-        res = network.optimized_call(inp)
+        res = network.optimized_call(inp,training=True)
 
         ops[0].meta['emb_batch'].scatter_update('embs', [op.meta['node_numb'] for op in ops], res)
         for op in ops:
