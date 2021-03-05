@@ -27,6 +27,9 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             loss_value=0
             loss_POS = 0
             loss_word = 0
+            gnorm_it = 0
+            h_norm_it = 0
+            w_norm_it = 0
 
             #shuffle dataset at beginning of each iteration
             shuffle(train_data)
@@ -73,9 +76,9 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     grad = tape.gradient(loss_miniBatch+ beta*w_norm +lamb*h_norm, variables)
                     gnorm = tf.global_norm(grad)
                     grad, _ = tf.clip_by_global_norm(grad, clipping, gnorm)
-                    tfs.scalar("norms/grad", gnorm)
-                    tfs.scalar("norms/hidden representation norm", h_norm)
-                    tfs.scalar("norms/square of weights norm", w_norm)
+                    gnorm_it +=gnorm
+                    h_norm_it += h_norm
+                    w_norm_it += w_norm
                     del current_batch_target
                     del current_batch_input
 
@@ -94,7 +97,9 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             tfs.scalar("loss/loss_value", loss_value)
             tfs.scalar("loss/loss_value_POS", loss_POS)
             tfs.scalar("loss/loss_value_word", loss_word)
-
+            tfs.scalar("norms/grad", gnorm_it)
+            tfs.scalar("norms/hidden representation norm", h_norm_it)
+            tfs.scalar("norms/square of weights norm", w_norm_it)
 
             # print stats
             if i % FLAGS.check_every == 0:
