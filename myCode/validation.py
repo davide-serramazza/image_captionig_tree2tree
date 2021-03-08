@@ -30,9 +30,10 @@ def main():
     parser.add_argument('hidden_coeff', type=float, help="coefficient for hidden dimension of encoder and decoder layer")
     learning_rate = 0.001
     clipping = 0.02
-    batch_size = 32
+    batch_size = 2
     #TODO da mettere come float se tenuto come coefficiente o come int se a se stante
     parser.add_argument('rnn_unit_size', type=int, help="size of rnn expressed as coefficient relative to embedding size")
+    parser.add_argument('drop_rate', type=float, help="drop rate for dropout")
 
     ####################
     args = parser.parse_args()
@@ -61,7 +62,7 @@ def main():
     decoder, encoder = get_encoder_decoder(emb_tree_size=args.emb_tree_word_size,cut_arity=cut_arity,max_arity=
     max(image_max_arity,sen_max_arity),max_node_count=max_node_count,max_depth=max_depth,hidden_coeff=args.hidden_coeff,
                                            activation=activation,image_tree=image_tree,sentence_tree=sentence_tree,emb_word_size=args.emb_tree_word_size,
-                                           hidden_word=args.rnn_unit_size)
+                                           hidden_word=args.rnn_unit_size,drop_rate=args.drop_rate)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 

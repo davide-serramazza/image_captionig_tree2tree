@@ -68,6 +68,8 @@ class ParallelDense(tf.keras.layers.Layer):
                                           initializer='random_normal',
                                           trainable=True)
 
+        self.drop1 = tf.keras.layers.Dropout(rate=0.5,name='dropout1')
+
         self.out_kernel = self.add_weight(name='out_kernel',
                                           shape=(self.parallel_clones, self.hidden_size, self.output_size),
                                           initializer='random_normal',
@@ -77,6 +79,8 @@ class ParallelDense(tf.keras.layers.Layer):
                                              shape=(self.parallel_clones, 1, self.output_size), # 1 is for broadcasting
                                              initializer='random_normal',
                                              trainable=True)
+
+        self.drop2 = tf.keras.layers.Dropout(rate=0.5,name='dropout2')
 
         if self.gated:
             self.gate_kernel = self.add_weight(name='gate_kernel',
@@ -89,9 +93,10 @@ class ParallelDense(tf.keras.layers.Layer):
                                              initializer='random_normal',
                                              trainable=True)
 
+
         super(ParallelDense, self).build(input_shape)
 
-    def call(self, x, n:int):
+    def call(self, x, n:int,  *args, **kwargs):
         """
 
         :param x: input [batch, input_size]
@@ -101,13 +106,16 @@ class ParallelDense(tf.keras.layers.Layer):
         x_ = tf.tile(tf.expand_dims(x, axis=0), [n, 1, 1])    # [clones, batch, input]
         #  [clones, batch, input] * [clones, input, hidden] = [clones, batch, hidden]
         hidden_activation = self.activation(tf.matmul(x_, self.hidden_kernel[:n]) + self.hidden_bias[:n])
+        hidden_activation = self.drop1(hidden_activation,training = kwargs["training"])
 
         # [clones, batch, hidden] * [clones, hidden, output] = [clones, batch, output]
         output = self.activation(tf.matmul(hidden_activation, self.out_kernel[:n]) + self.out_bias[:n])
+        output = self.drop2(output,training = kwargs["training"])
 
         if self.gated:
             gate_inp = tf.concat([x, tf.reshape(output, [x.shape[0], -1])], axis=-1)
-            gate = tf.nn.softmax(tf.nn.leaky_relu(tf.matmul(gate_inp, self.gate_kernel[:gate_inp.shape[1], :n]) + self.gate_bias[:n]), axis=-1)
+            gate_output = tf.matmul(gate_inp, self.gate_kernel[:gate_inp.shape[1], :n]) + self.gate_bias[:n]
+            gate = tf.nn.softmax(gate_output, axis=-1)
             gate = tf.reshape(gate, [n, -1, 1])
             corrected = tf.reshape(x, [1, x.shape[0], -1])[:, :, :self.output_size] * gate + (1-gate) * output
             return corrected

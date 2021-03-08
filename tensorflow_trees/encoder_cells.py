@@ -59,9 +59,7 @@ class GatedFixedArityNodeEmbedder(tf.keras.Model):
         else:
             output = self.output_f(concat,training = kwargs["training"])
         # [batch, emb]
-        print(output)
-        if kwargs!={}:
-            exit()
+
         # output gatings only on children embeddings (value embedding size might be different)
         # out = g * out + (g1 * c1 + g2 * c2 ...)
         childrens = tf.reshape(children, [children.shape[0], self.arity, -1])  # [batch, arity, children_emb]

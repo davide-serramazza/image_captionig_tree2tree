@@ -90,6 +90,9 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             loss_value /= (int(int(len_input)/batch_size)+1)
             loss_POS  /= (int(int(len_input)/batch_size)+1)
             loss_word /= (int(int(len_input)/batch_size)+1)
+            gnorm_it  /= (int(int(len_input)/batch_size)+1)
+            h_norm_it  /= (int(int(len_input)/batch_size)+1)
+            w_norm_it  /= (int(int(len_input)/batch_size)+1)
             loss = loss_struct+loss_value
             print("iterartion",i,loss,loss_word,loss_POS)
 

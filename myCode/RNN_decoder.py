@@ -111,21 +111,21 @@ class RNN_Decoder(tf.keras.Model):
 
 
 class NIC_Decoder(tf.keras.Model):
-    def __init__(self,embedding_dim, units, vocab_size):
+    def __init__(self,embedding_dim, units, vocab_size,drop_rate):
         super(NIC_Decoder,self).__init__()
         self.embedding_layer = tf.keras.layers.Embedding(input_dim=vocab_size,output_dim=embedding_dim, name="embedding")
-        self.rnn =tf.keras.layers.LSTM(units=units, return_state=True, return_sequences=True, name="LSTM")
-        self.final_layer = tf.keras.layers.Dense(vocab_size, activation="linear",
-                                                 name="final_word_pred_layer")
+        self.drop_word = tf.keras.layers.Dropout(drop_rate,noise_shape=(None,1,embedding_dim))
+        self.rnn =tf.keras.layers.LSTM(units=units, return_state=True, return_sequences=True,recurrent_dropout=drop_rate, name="LSTM")
+        self.drop_final = tf.keras.layers.Dropout(drop_rate)
+        self.final_layer = tf.keras.layers.Dense(vocab_size, activation="linear",name="final_word_pred_layer")
         self.units = units
 
 
     def call(self,pos_embs, images_emb, targets):
 
-        #TODO non passare one-hot vec ma direttamente indice utilizzare dtype=tf.uint16/8 e shape=(1)
-        #TODO capire anche discrso di rnn_unts (usare debugger per capire cosa istanzia la LSTM)
         # from targets can discard last ones (no other words to predict after the last ones)
         word_embs = self.embedding_layer(targets[:,:-1])
+        word_embs = self.drop_word(word_embs,training=True)
 
         # concatenate image embedding as first time stamp
         images_emb = tf.expand_dims(images_emb,axis=1)
@@ -137,7 +137,7 @@ class NIC_Decoder(tf.keras.Model):
         # call LSTM
         states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
         rnn_output,state_h,state_c= self.rnn(rnn_input, initial_state = states)
-
+        rnn_output = self.drop_final(rnn_output,training=True)
         #get predictions from last layer
         predictions = self.final_layer(rnn_output)
 
