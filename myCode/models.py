@@ -3,7 +3,10 @@ from tensorflow_trees.encoder import Encoder, EncoderCellsBuilder
 from myCode.tree_defintions import WordValue
 from myCode.CNN_encoder import CNN_Encoder
 from myCode.RNN_decoder import RNN_Decoder,NIC_Decoder
+import tensorflow_trees.decoder_cells as decoder_cell
+import tensorflow_trees.encoder_cells as encoder_cell
 
+from tensorflow_trees.decoder_cells import drop_rate
 # cut_arity è il numero di nodi che vengono passati direttamente all'encodder flat, se = n l'input n+1 è
 # l'attention applicata a tutti gli altri i   nput
 # variable_arity_strategy se usare flat o altro, forse unica scelta possibile è flat???
@@ -16,6 +19,9 @@ from myCode.RNN_decoder import RNN_Decoder,NIC_Decoder
 def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_node_count, max_depth, hidden_coeff,
                         activation,emb_word_size,image_tree, sentence_tree,drop_rate):
 
+    decoder_cell.drop_rate = drop_rate
+    encoder_cell.drop_rate = drop_rate
+
     if image_tree==None:
         encoder = CNN_Encoder(emb_tree_size)
     else:
@@ -23,7 +29,7 @@ def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_nod
                           variable_arity_strategy="FLAT",name="encoder",
 
                 cellsbuilder=EncoderCellsBuilder(EncoderCellsBuilder.simple_cell_builder(
-                    hidden_coef=hidden_coeff, activation=activation,gate=True),
+                    hidden_coef=hidden_coeff, activation=activation,gate=True,drop_rate=drop_rate),
 
                 EncoderCellsBuilder.simple_dense_embedder_builder(activation=activation)))
 

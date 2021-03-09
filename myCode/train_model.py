@@ -44,7 +44,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     batch_enc = encoder(current_batch_input)
                     root_emb = batch_enc.get_root_embeddings() if tree_encoder else batch_enc
                     if tree_decoder:
-                        batch_dec = decoder(encodings=root_emb, targets=current_batch_target,keep_rate=keep_rate,n_it=i)
+                        batch_dec = decoder(encodings=root_emb, targets=current_batch_target)
                         # compute global loss
                         loss_struct_miniBatch, loss_values_miniBatch = batch_dec.reconstruction_loss()
                         loss_value__miniBatch = loss_values_miniBatch["POS_tag"] + loss_values_miniBatch["word"]
@@ -119,7 +119,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     batch_val_enc = batch_val_enc.get_root_embeddings()
 
                 if tree_decoder:
-                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,n_it=i)
+                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val)
                     loss_struct_val, loss_values_validation = batch_val_dec.reconstruction_loss()
                     loss_validation = loss_struct_val + loss_values_validation["POS_tag"]+loss_values_validation["word"]
                     tfs.scalar("loss/validation/loss_struc", loss_struct_val)

@@ -56,7 +56,7 @@ def get_ordered_nodes(embeddings, ops,TR, trees):
 #functions used in words prediction
 #######################
 def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
-                      root_only_in_fist_LSTM_time,perm2unsort, keep_rate, n_it):
+                      root_only_in_fist_LSTM_time,perm2unsort):
     """
     function taking care of the wall word prediction (it calls several other functions)
     :param embedding:

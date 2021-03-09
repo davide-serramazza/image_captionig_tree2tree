@@ -147,6 +147,7 @@ class GatedNullableInput(tf.keras.Model):
                                                 hidden_size=self.maximum_input_size // self.embedding_size + 1)
 
         self.output_model = self.output_model_builder()
+        self.dropout = tf.keras.layers.Dropout(rate=drop_rate)
 
         super(GatedNullableInput, self).build(input_shape)
 

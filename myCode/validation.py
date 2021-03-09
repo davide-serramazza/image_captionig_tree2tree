@@ -30,8 +30,7 @@ def main():
     parser.add_argument('hidden_coeff', type=float, help="coefficient for hidden dimension of encoder and decoder layer")
     learning_rate = 0.001
     clipping = 0.02
-    batch_size = 2
-    #TODO da mettere come float se tenuto come coefficiente o come int se a se stante
+    batch_size = 32
     parser.add_argument('rnn_unit_size', type=int, help="size of rnn expressed as coefficient relative to embedding size")
     parser.add_argument('drop_rate', type=float, help="drop rate for dropout")
 
@@ -68,7 +67,7 @@ def main():
 
     print("begin train")
     name = "emb_dim_"+str(args.emb_tree_word_size)+"_rnn_units_"+str(args.rnn_unit_size)+"_lambda_"+str(args.lambd)+ \
-           " _beta_"+str(args.beta)+"_hidden_coeff_"+str(args.hidden_coeff)[2:]
+           " _beta_"+str(args.beta)+"_hidden_coeff_"+str(args.hidden_coeff)[2:]+"_drop_rate_" + str(args.drop_rate)
     train_model(FLAGS=FLAGS, decoder=decoder,
                 encoder=encoder, train_data=train_data, val_data=val_data, optimizer=optimizer,
                 beta=args.beta, lamb=args.lambd, clipping=clipping, batch_size=batch_size,

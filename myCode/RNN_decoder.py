@@ -116,8 +116,8 @@ class NIC_Decoder(tf.keras.Model):
         self.embedding_layer = tf.keras.layers.Embedding(input_dim=vocab_size,output_dim=embedding_dim, name="embedding")
         self.drop_word = tf.keras.layers.Dropout(drop_rate,noise_shape=(None,1,embedding_dim))
         self.rnn =tf.keras.layers.LSTM(units=units, return_state=True, return_sequences=True,recurrent_dropout=drop_rate, name="LSTM")
-        self.drop_final = tf.keras.layers.Dropout(drop_rate)
         self.final_layer = tf.keras.layers.Dense(vocab_size, activation="linear",name="final_word_pred_layer")
+        self.drop_final = tf.keras.layers.Dropout(drop_rate)
         self.units = units
 
 
@@ -149,7 +149,7 @@ class NIC_Decoder(tf.keras.Model):
         max_length = pos_embs.shape[1]
         to_return=[]
 
-        #sampling of all word in parallel
+        # sampling of all words in parallel
         for i in range(max_length):
             if i==0:
                 current_word_embs = tf.expand_dims(features, axis=1)

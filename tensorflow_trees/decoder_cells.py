@@ -4,6 +4,8 @@ import typing as T
 from tensorflow_trees.definition import NodeDefinition
 
 
+drop_rate = None
+
 class GatedFixedArityNodeDecoder(tf.keras.Model):
     """ Build a dense 2-layer which is optimized for left-0-padded input """
 
@@ -56,7 +58,7 @@ class ParallelDense(tf.keras.layers.Layer):
 
         super(ParallelDense, self).__init__(**kwargs)
 
-    def build(self, input_shape):
+    def build(self, input_shape,*args, **kwargs):
 
         self.hidden_kernel = self.add_weight(name='hidden_kernel',
                                              shape=[self.parallel_clones, input_shape[1].value, self.hidden_size],
@@ -68,7 +70,7 @@ class ParallelDense(tf.keras.layers.Layer):
                                           initializer='random_normal',
                                           trainable=True)
 
-        self.drop1 = tf.keras.layers.Dropout(rate=0.5,name='dropout1')
+        self.drop1 = tf.keras.layers.Dropout(rate=drop_rate,name='dropout1')
 
         self.out_kernel = self.add_weight(name='out_kernel',
                                           shape=(self.parallel_clones, self.hidden_size, self.output_size),
@@ -80,7 +82,7 @@ class ParallelDense(tf.keras.layers.Layer):
                                              initializer='random_normal',
                                              trainable=True)
 
-        self.drop2 = tf.keras.layers.Dropout(rate=0.5,name='dropout2')
+        self.drop2 = tf.keras.layers.Dropout(rate=drop_rate,name='dropout2')
 
         if self.gated:
             self.gate_kernel = self.add_weight(name='gate_kernel',
