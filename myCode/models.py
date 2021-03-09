@@ -15,9 +15,8 @@ from tensorflow_trees.decoder_cells import drop_rate
 # questo coeff viene utilizzato come peso nella combinazione lineare
 
 
-
 def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_node_count, max_depth, hidden_coeff,
-                        activation,emb_word_size,image_tree, sentence_tree,drop_rate):
+                        activation,emb_word_size,image_tree, sentence_tree,drop_rate,drop_rate_input):
 
     decoder_cell.drop_rate = drop_rate
     encoder_cell.drop_rate = drop_rate
@@ -29,9 +28,9 @@ def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_nod
                           variable_arity_strategy="FLAT",name="encoder",
 
                 cellsbuilder=EncoderCellsBuilder(EncoderCellsBuilder.simple_cell_builder(
-                    hidden_coef=hidden_coeff, activation=activation,gate=True),#,drop_rate=drop_rate),
+                    hidden_coef=hidden_coeff, activation=activation,gate=True,drop_rate=drop_rate),
 
-                EncoderCellsBuilder.simple_dense_embedder_builder(activation=activation)))
+                EncoderCellsBuilder.simple_dense_embedder_builder(activation=activation,drop_rate=drop_rate_input)))
 
     WordValue.set_embedding_size(emb_word_size)
 

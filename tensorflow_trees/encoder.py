@@ -63,17 +63,20 @@ class EncoderCellsBuilder:
         return f
 
     @staticmethod
-    def simple_dense_embedder_builder(activation=tf.nn.leaky_relu):
+    def simple_dense_embedder_builder(drop_rate,activation=tf.nn.leaky_relu):
         def f(leaf_def: NodeDefinition, embedding_size, name=None):
 
-            return tf.keras.layers.Dense(embedding_size,
+            return tf.keras.Sequential([
+                tf.keras.layers.Dense(embedding_size,
                                          activation=activation,
                                          input_shape=(leaf_def.value_type.representation_shape,),
-                                         name=name)
+                                         name=name),
+                tf.keras.layers.Dropout(rate=drop_rate)
+                ])
         return f
 
     @staticmethod
-    def simple_cell_builder(hidden_coef, activation=tf.nn.leaky_relu, gate=True):
+    def simple_cell_builder(hidden_coef, drop_rate,activation=tf.nn.leaky_relu, gate=True):
         def f(node_def: NodeDefinition, encoder: 'Encoder', name=None):
             if type(node_def.arity) == node_def.VariableArity:
                 if not encoder.use_flat_strategy:
@@ -87,21 +90,24 @@ class EncoderCellsBuilder:
                     # +1 1 is the summarization of extra children
                     input_size = encoder.embedding_size * (encoder.cut_arity + 1) + \
                                  (node_def.value_type.representation_shape if node_def.value_type is not None else 0)
+
                     output_model_builder = lambda :tf.keras.Sequential([
                         NullableInputDenseLayer(input_size=input_size,
-                                                hidden_activation=activation, hidden_size=encoder.embedding_size * int(encoder.cut_arity**hidden_coef)),
-                        tf.keras.layers.Dense(encoder.embedding_size, activation=activation)
-                    ], name=name)
+                    hidden_activation=activation, hidden_size=encoder.embedding_size * int(encoder.cut_arity**hidden_coef)),
+                        tf.keras.layers.Dropout(rate=drop_rate),
+                        tf.keras.layers.Dense(encoder.embedding_size, activation=activation),
+                        tf.keras.layers.Dropout(rate=drop_rate)
+                            ], name=name)
 
-                    return GatedNullableInput(output_model_builder=output_model_builder,
-                                              maximum_input_size=input_size,
-                                              embedding_size=encoder.embedding_size,
-                                              name=name) if gate else output_model_builder(), \
+                    return GatedNullableInput(output_model_builder=output_model_builder,maximum_input_size=input_size,
+                            embedding_size=encoder.embedding_size,name=name) if gate else output_model_builder(), \
                            tf.keras.Sequential([
                                # tf.keras.layers.Reshape([encoder.max_arity - encoder.cut_arity, encoder.embedding_size]),
                                tf.keras.layers.Dense(int(encoder.embedding_size * hidden_coef), activation=activation, input_shape=(encoder.embedding_size,),
                                                      name=name + '/extra_attention/1'),
-                               tf.keras.layers.Dense(1, name=name + '/extra_attention/2')
+                               tf.keras.layers.Dropout(rate=drop_rate),
+                               tf.keras.layers.Dense(1, name=name + '/extra_attention/2'),
+                               tf.keras.layers.Dropout(rate=drop_rate)
                            ])
                     # input_shape = (encoder.embedding_size * encoder.max_arity, )
             elif type(node_def.arity) == node_def.FixedArity:

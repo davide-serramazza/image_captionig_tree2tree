@@ -32,9 +32,10 @@ def main():
     clipping = 0.02
     batch_size = 32
     parser.add_argument('rnn_unit_size', type=int, help="size of rnn expressed as coefficient relative to embedding size")
-    parser.add_argument('drop_rate', type=float, help="drop rate for dropout")
+    parser.add_argument('drop_rate', type=float, help="drop rate for hidden layers")
+    parser.add_argument('drop_rate_input', type=float, help="drop rate for input layers")
 
-    ####################
+####################
     args = parser.parse_args()
 
     ##################
@@ -60,8 +61,8 @@ def main():
     activation = getattr(tf.nn, FLAGS.activation)
     decoder, encoder = get_encoder_decoder(emb_tree_size=args.emb_tree_word_size,cut_arity=cut_arity,max_arity=
     max(image_max_arity,sen_max_arity),max_node_count=max_node_count,max_depth=max_depth,hidden_coeff=args.hidden_coeff,
-                                           activation=activation,image_tree=image_tree,sentence_tree=sentence_tree,emb_word_size=args.emb_tree_word_size,
-                                           hidden_word=args.rnn_unit_size,drop_rate=args.drop_rate)
+                activation=activation,image_tree=image_tree,sentence_tree=sentence_tree,emb_word_size=args.emb_tree_word_size,
+                                    hidden_word=args.rnn_unit_size,drop_rate=args.drop_rate,drop_rate_input=args.drop_rate_input)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 

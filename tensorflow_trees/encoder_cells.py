@@ -3,6 +3,7 @@ import typing as T
 
 from tensorflow_trees.definition import NodeDefinition
 
+drop_rate = -1
 
 class GatedFixedArityNodeEmbedder(tf.keras.Model):
 
@@ -32,9 +33,12 @@ class GatedFixedArityNodeEmbedder(tf.keras.Model):
         self.output_f = tf.keras.Sequential([
             tf.keras.layers.Dense(size,
                                   activation=self.activation, name='/1'),
+            tf.keras.layers.Dropout(rate=drop_rate),
             tf.keras.layers.Dense(size,
                                   activation=self.activation, name='/2a'),
-            tf.keras.layers.Dense(self.embedding_size, activation=self.activation, name='/2')
+            tf.keras.layers.Dropout(rate=drop_rate),
+            tf.keras.layers.Dense(self.embedding_size, activation=self.activation, name='/2'),
+            tf.keras.layers.Dropout(rate=drop_rate)
         ])
 
         super(GatedFixedArityNodeEmbedder, self).build(input_shape)

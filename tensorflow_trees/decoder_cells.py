@@ -4,7 +4,7 @@ import typing as T
 from tensorflow_trees.definition import NodeDefinition
 
 
-drop_rate = None
+drop_rate = -1
 
 class GatedFixedArityNodeDecoder(tf.keras.Model):
     """ Build a dense 2-layer which is optimized for left-0-padded input """
