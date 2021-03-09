@@ -32,9 +32,12 @@ class GatedFixedArityNodeEmbedder(tf.keras.Model):
         self.output_f = tf.keras.Sequential([
             tf.keras.layers.Dense(size,
                                   activation=self.activation, name='/1'),
+            tf.keras.layers.Dropout(rate=0.5),
             tf.keras.layers.Dense(size,
                                   activation=self.activation, name='/2a'),
-            tf.keras.layers.Dense(self.embedding_size, activation=self.activation, name='/2')
+            tf.keras.layers.Dropout(rate=0.5),
+            tf.keras.layers.Dense(self.embedding_size, activation=self.activation, name='/2'),
+            tf.keras.layers.Dropout(rate=0.5)
         ])
 
         super(GatedFixedArityNodeEmbedder, self).build(input_shape)
@@ -49,8 +52,13 @@ class GatedFixedArityNodeEmbedder(tf.keras.Model):
         :return: [clones, batch, output_size]
         """
         children, values = x
+
         concat = tf.concat([children, values], axis=-1)
-        output = self.output_f(concat)  # [batch, emb]
+        if kwargs=={}:
+            output = self.output_f(concat)
+        else:
+            output = self.output_f(concat,training = kwargs["training"])
+        # [batch, emb]
 
         # output gatings only on children embeddings (value embedding size might be different)
         # out = g * out + (g1 * c1 + g2 * c2 ...)
@@ -139,6 +147,7 @@ class GatedNullableInput(tf.keras.Model):
                                                 hidden_size=self.maximum_input_size // self.embedding_size + 1)
 
         self.output_model = self.output_model_builder()
+        self.dropout = tf.keras.layers.Dropout(rate=drop_rate)
 
         super(GatedNullableInput, self).build(input_shape)
 

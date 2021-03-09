@@ -73,7 +73,7 @@ class EncoderCellsBuilder:
         return f
 
     @staticmethod
-    def simple_cell_builder(hidden_coef, activation=tf.nn.leaky_relu, gate=True):
+    def simple_cell_builder(hidden_coef,drop_rate, activation=tf.nn.leaky_relu, gate=True):
         def f(node_def: NodeDefinition, encoder: 'Encoder', name=None):
             if type(node_def.arity) == node_def.VariableArity:
                 if not encoder.use_flat_strategy:
@@ -87,10 +87,13 @@ class EncoderCellsBuilder:
                     # +1 1 is the summarization of extra children
                     input_size = encoder.embedding_size * (encoder.cut_arity + 1) + \
                                  (node_def.value_type.representation_shape if node_def.value_type is not None else 0)
+
                     output_model_builder = lambda :tf.keras.Sequential([
-                        NullableInputDenseLayer(input_size=input_size,
-                                                hidden_activation=activation, hidden_size=encoder.embedding_size * int(encoder.cut_arity**hidden_coef)),
-                        tf.keras.layers.Dense(encoder.embedding_size, activation=activation)
+                        NullableInputDenseLayer(input_size=input_size, hidden_activation=activation,
+                            hidden_size=encoder.embedding_size * int(encoder.cut_arity**hidden_coef)),
+                        tf.keras.layers.Dropout(rate=drop_rate),
+                        tf.keras.layers.Dense(encoder.embedding_size, activation=activation),
+                        tf.keras.layers.Dropout(rate=drop_rate),
                     ], name=name)
 
                     return GatedNullableInput(output_model_builder=output_model_builder,
@@ -159,7 +162,7 @@ class Encoder(tf.keras.Model):
 
     def _c_fixed_op(self, inp, ops, network):
 
-        res = network.optimized_call(inp)
+        res = network.optimized_call(inp,training=True)
 
         ops[0].meta['emb_batch'].scatter_update('embs', [op.meta['node_numb'] for op in ops], res)
         for op in ops:
@@ -178,7 +181,7 @@ class Encoder(tf.keras.Model):
         else:
             return tf.tuple([inp, tf.zeros([inp.shape[0], 0])])
 
-    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]]) -> BatchOfTreesForEncoding:
+    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]],keep_prob_input=1.0,keep_prob=1.0) -> BatchOfTreesForEncoding:
 
         if not type(batch) == BatchOfTreesForEncoding:
             batch = BatchOfTreesForEncoding(batch, self.embedding_size)
@@ -222,8 +225,10 @@ class Encoder(tf.keras.Model):
 
             if op_t == 'E':
 
+                #TODO capire che voglio fare con root
                 inp = node_t.value_type.abstract_to_representation_batch([x.value.abstract_value for x in ops])
                 res = network.optimized_call(inp)
+                res = tf.nn.dropout(res,keep_prob=keep_prob_input)
 
                 #  superfluous when node is fused
                 if node_id not in self.tree_def.fusable_nodes_id_child_parent.keys():
