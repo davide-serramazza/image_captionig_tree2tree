@@ -56,7 +56,7 @@ def get_ordered_nodes(embeddings, ops,TR, trees):
 #functions used in words prediction
 #######################
 def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
-                      root_only_in_fist_LSTM_time,perm2unsort):
+                      root_only_in_fist_LSTM_time,perm2unsort,samp):
     """
     function taking care of the wall word prediction (it calls several other functions)
     :param embedding:
@@ -81,7 +81,10 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
         predictions =word_module.call(inputs, roots_emb,targets_padded_sentences)
     else:
         #otherwise sampling
-        predictions =  word_module.sampling(roots_emb,inputs)
+        if samp:
+            predictions = word_module.sampling(roots_emb,inputs)
+        else:
+            predictions =  word_module.beam_search(roots_emb,inputs)
     #unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort)
     return vals

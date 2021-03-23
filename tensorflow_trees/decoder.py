@@ -225,7 +225,7 @@ class Decoder(tf.keras.Model):
 
     def __call__(self, *,
                  encodings: tf.Tensor = None, targets: T.List[Tree] = None,     # this two lines are mutual exclusive
-                 batch: BatchOfTreesForDecoding = None,augment_fn=None):
+                 batch: BatchOfTreesForDecoding = None,augment_fn=None, samp ):
         """ Batched computation. All fireable operations are grouped according to node kinds and the one single aggregated
         operation is ran. Turned out to give a ~2x speedup.
         :param embeddings: [batch_size, embedding_size]
@@ -329,7 +329,7 @@ class Decoder(tf.keras.Model):
                     vals = infl.compiled_call(inp,training=TR)
                 else:
                     vals = words_predictions(self.word_module,batch_idxs,
-                        inp,targets,TR, encodings, self.root_only_in_fist_LSTM_time,perm2usort)
+                        inp,targets,TR, encodings, self.root_only_in_fist_LSTM_time,perm2usort,samp)
                     #if current nodes are words, "unsort matrix contaning it i.e. go back to order expected
                     #by following code
 

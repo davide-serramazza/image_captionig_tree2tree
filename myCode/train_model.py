@@ -6,6 +6,8 @@ import tensorflow as tf
 from nltk.translate.bleu_score import corpus_bleu
 import myCode.shared_POS_words_lists as shared_list
 from random import shuffle
+from helper_functions import Summary
+
 
 def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,lamb,clipping,batch_size, flat_val_captions, tensorboard_name,
@@ -13,9 +15,6 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
     best_loss = 100
     best_bleu=0
-    if final:
-        FLAGS.max_iter = 2000
-        FLAGS.check_every = 10
 
     #tensorboard
     summary_writer = tfs.create_file_writer(FLAGS.model_dir+tensorboard_name, flush_millis=1000)
@@ -23,13 +22,8 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
     with tfs.always_record_summaries():
         for i in range(FLAGS.max_iter):
-            loss_struct=0
-            loss_value=0
             loss_POS = 0
             loss_word = 0
-            gnorm_it = 0
-            h_norm_it = 0
-            w_norm_it = 0
 
             #shuffle dataset at beginning of each iteration
             shuffle(train_data)
@@ -38,23 +32,18 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             for j in range(0,len_input,batch_size):
                 with tfe.GradientTape() as tape:
 
+                    summary = Summary(train=True)
                     current_batch_input, current_batch_target = get_input_target_minibatch(train_data,j,batch_size,tree_encoder)
 
                     # encode and decode datas
                     batch_enc = encoder(current_batch_input)
                     root_emb = batch_enc.get_root_embeddings() if tree_encoder else batch_enc
                     if tree_decoder:
-                        batch_dec = decoder(encodings=root_emb, targets=current_batch_target)
+                        batch_dec = decoder(encodings=root_emb, targets=current_batch_target,samp=False)
                         # compute global loss
                         loss_struct_miniBatch, loss_values_miniBatch = batch_dec.reconstruction_loss()
                         loss_value__miniBatch = loss_values_miniBatch["POS_tag"] + loss_values_miniBatch["word"]
                         loss_miniBatch = loss_value__miniBatch+loss_struct_miniBatch
-
-                        #compute minibatch loss
-                        loss_struct += loss_struct_miniBatch
-                        loss_value += loss_value__miniBatch
-                        loss_POS += loss_values_miniBatch["POS_tag"]
-                        loss_word +=  loss_values_miniBatch["word"]
                     else:
                         loss_single_word=0
                         hidden = decoder.reset_state(batch_size=current_batch_target.shape[0])
@@ -75,35 +64,15 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     # compute gradient
                     grad = tape.gradient(loss_miniBatch+ beta*w_norm +lamb*h_norm, variables)
                     gnorm = tf.global_norm(grad)
-                    grad, _ = tf.clip_by_global_norm(grad, clipping, gnorm)
-                    gnorm_it +=gnorm
-                    h_norm_it += h_norm
-                    w_norm_it += w_norm
+                    grad_clipped,_= tf.clip_by_global_norm(grad,clipping,gnorm)
                     del current_batch_target
                     del current_batch_input
-
                     # apply optimizer on gradient
-                    optimizer.apply_gradients(zip(grad, variables), global_step=tf.train.get_or_create_global_step())
+                    optimizer.apply_gradients(zip(grad_clipped, variables), global_step=tf.train.get_or_create_global_step())
+                    summary.add_miniBatch_summary(loss_struct_miniBatch,loss_value__miniBatch,loss_values_miniBatch["POS_tag"],
+                                                  loss_values_miniBatch["word"],h_norm,w_norm,gnorm,grad,grad_clipped,variables)
 
-
-            loss_struct /= (int(int(len_input)/batch_size)+1)
-            loss_value /= (int(int(len_input)/batch_size)+1)
-            loss_POS  /= (int(int(len_input)/batch_size)+1)
-            loss_word /= (int(int(len_input)/batch_size)+1)
-            gnorm_it  /= (int(int(len_input)/batch_size)+1)
-            h_norm_it  /= (int(int(len_input)/batch_size)+1)
-            w_norm_it  /= (int(int(len_input)/batch_size)+1)
-            loss = loss_struct+loss_value
-            print("iterartion",i,loss,loss_word,loss_POS)
-
-            tfs.scalar("loss/loss_struc", loss_struct)
-            tfs.scalar("loss/loss_value", loss_value)
-            tfs.scalar("loss/loss_value_POS", loss_POS)
-            tfs.scalar("loss/loss_value_word", loss_word)
-            tfs.scalar("norms/grad", gnorm_it)
-            tfs.scalar("norms/hidden representation norm", h_norm_it)
-            tfs.scalar("norms/square of weights norm", w_norm_it)
-
+            summary.print_summary(i)
             # print stats
             if i % FLAGS.check_every == 0:
                 #var_to_save = encoder.variables+encoder.weights + decoder.variables+decoder.weights + optimizer.variables()
@@ -119,7 +88,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     batch_val_enc = batch_val_enc.get_root_embeddings()
 
                 if tree_decoder:
-                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val)
+                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,samp=False)
                     loss_struct_val, loss_values_validation = batch_val_dec.reconstruction_loss()
                     loss_validation = loss_struct_val + loss_values_validation["POS_tag"]+loss_values_validation["word"]
                     tfs.scalar("loss/validation/loss_struc", loss_struct_val)
@@ -131,10 +100,12 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                           " loss validation word is ", loss_values_validation["word"], " loss validation POS is ", loss_values_validation["POS_tag"])
 
                     #get unsupervised validation loss
-                    batch_unsuperv = decoder(encodings=batch_val_enc)
+                    batch_unsuperv = decoder(encodings=batch_val_enc,samp=True)
+                    pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
+                    batch_unsuperv = decoder(encodings=batch_val_enc,samp=False)
                     s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
                         Tree.compare_trees(target_val, batch_unsuperv.decoded_trees)
-                    pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
+                    pred_sentences_b = extract_words_from_tree(batch_unsuperv.decoded_trees)
                     tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
                     tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
                     tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
@@ -142,9 +113,8 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
                     tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
                 else:
-                    pred_sentences= decoder.sampling(batch_val_enc,wi=shared_list.word_idx,
+                    pred_sentences_s= decoder.sampling(batch_val_enc,wi=shared_list.word_idx,
                                                      iw=shared_list.idx_word,max_length=int(target_val.shape[1]))
-
                 bleu_1 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1.0,))
                 bleu_2 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.5,0.5))
                 bleu_3 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1/3,1/3,1/3))
@@ -153,6 +123,14 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 tfs.scalar("bleu/blue-2", bleu_2)
                 tfs.scalar("bleu/blue-3", bleu_3)
                 tfs.scalar("bleu/blue-4", bleu_4)
+                bleu_1 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1.0,))
+                bleu_2 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.5,0.5))
+                bleu_3 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1/3,1/3,1/3))
+                bleu_4 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.25,0.25,0.25,0.25))
+                tfs.scalar("bleu/blue-1_b", bleu_1)
+                tfs.scalar("bleu/blue-2_b", bleu_2)
+                tfs.scalar("bleu/blue-3_b", bleu_3)
+                tfs.scalar("bleu/blue-4_b", bleu_4)
 
                 if tree_decoder:
                     print("iteration ", i, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",

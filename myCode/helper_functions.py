@@ -7,6 +7,7 @@ from tensorflow_trees.definition import Tree
 from myCode.read_sentence import label_tree_with_real_data
 import myCode.shared_POS_words_lists as shared_list
 import xml.etree.ElementTree as ET
+import tensorflow.contrib.summary as tfs
 
 
 ######################
@@ -147,3 +148,101 @@ def get_input_target_minibatch(data,j,batch_size,tree_encoder):
     if not tree_encoder:
         images  = tf.convert_to_tensor(images)
     return images,captions
+
+class Summary ():
+    def __init__(self,train):
+        self.loss_struct = 0
+        self.loss_value = 0
+        self.loss_POS = 0
+        self.loss_word = 0
+        self.h_norm_it= 0
+        self.w_norm_it= 0
+        #grads
+        self.gnorm_tot_it= 0
+        self.gnorm_enc_it=0
+        self.gnorm_dec_it=0
+        self.gnorm_RNN_it=0
+        self.gnorm_wordModule_it=0
+        #grads clipped
+        self.gnorm_tot_it_clipped= 0
+        self.gnorm_enc_it_clipped=0
+        self.gnorm_dec_it_clipped=0
+        self.gnorm_RNN_it_clipped=0
+        self.gnorm_wordModule_it_clipped=0
+
+        self.n_miniBatch = 0
+        self.train = train
+
+
+    def add_miniBatch_summary(self,loss_struct_miniBatch,loss_value_miniBatch,loss_value_miniBatch_pos,loss_value_miniBatch_word,
+                              h_norm,w_norm,gnorm,grad,grad_clipped,variables):
+        self.loss_struct += loss_struct_miniBatch
+        self.loss_value += loss_value_miniBatch
+        self.loss_POS += loss_value_miniBatch_pos
+        self.loss_word +=  loss_value_miniBatch_word
+        self.h_norm_it += h_norm
+        self.w_norm_it += w_norm
+
+        enc_v=[]
+        dec_v=[]
+        rnn_v=[]
+        word_module_v=[]
+
+        enc_v_clipped=[]
+        dec_v_clipped=[]
+        rnn_v_clipped=[]
+        word_module_v_clipped=[]
+
+        for (g,gc,v) in zip (grad,grad_clipped,variables):
+            if "cnn__encoder" in v.name:
+                enc_v.append(g)
+                enc_v_clipped.append(gc)
+            elif 'final_word_pred' in v.name or 'word_embedding' in v.name:
+                word_module_v.append(g)
+                word_module_v_clipped.append(gc)
+            elif 'LSTM' in v.name:
+                word_module_v.append(g)
+                rnn_v.append(g)
+                word_module_v_clipped.append(gc)
+                rnn_v_clipped.append(gc)
+            else:
+                dec_v.append(g)
+                dec_v_clipped.append(gc)
+
+        self.gnorm_tot_it += gnorm
+        self.gnorm_enc_it += tf.global_norm(enc_v)
+        self.gnorm_dec_it += tf.global_norm(dec_v)
+        self.gnorm_RNN_it += tf.global_norm(rnn_v)
+        self.gnorm_wordModule_it += tf.global_norm(word_module_v)
+
+        self.gnorm_tot_it_clipped += tf.global_norm(grad_clipped)
+        self.gnorm_enc_it_clipped += tf.global_norm(enc_v_clipped)
+        self.gnorm_dec_it_clipped += tf.global_norm(dec_v_clipped)
+        self.gnorm_RNN_it_clipped += tf.global_norm(rnn_v_clipped)
+        self.gnorm_wordModule_it_clipped += tf.global_norm(word_module_v_clipped)
+
+        self.n_miniBatch+=1
+
+    def print_summary(self,it):
+        name = "" if self.train else "val"
+        tfs.scalar("loss/loss_struc"+name, self.loss_struct /self.n_miniBatch)
+        tfs.scalar("loss/loss_value"+name, self.loss_value /self.n_miniBatch)
+        tfs.scalar("loss/loss_value_POS"+name, self.loss_POS /self.n_miniBatch)
+        tfs.scalar("loss/loss_value_word"+name, self.loss_word /self.n_miniBatch)
+        tfs.scalar("norms/hidden representation norm"+name, self.h_norm_it/self.n_miniBatch)
+        tfs.scalar("norms/square of weights norm"+name, self.w_norm_it/self.n_miniBatch)
+
+        tfs.scalar("norms/grad"+name, self.gnorm_tot_it /self.n_miniBatch)
+        tfs.scalar("norms/dec_grad"+name, self.gnorm_dec_it/self.n_miniBatch)
+        tfs.scalar("norms/RNN_grad"+name, self.gnorm_RNN_it/self.n_miniBatch)
+        tfs.scalar("norms/word_module_grad"+name, self.gnorm_wordModule_it/self.n_miniBatch)
+        tfs.scalar("norms/enc_grad"+name, self.gnorm_enc_it/self.n_miniBatch)
+
+        tfs.scalar("norms/grad_clipped"+name, self.gnorm_tot_it_clipped /self.n_miniBatch)
+        tfs.scalar("norms/dec_grad_clipped"+name, self.gnorm_dec_it_clipped/self.n_miniBatch)
+        tfs.scalar("norms/RNN_grad_clipped"+name, self.gnorm_RNN_it_clipped/self.n_miniBatch)
+        tfs.scalar("norms/word_module_grad_clipped"+name, self.gnorm_wordModule_it_clipped/self.n_miniBatch)
+        tfs.scalar("norms/enc_grad_clipped"+name, self.gnorm_enc_it_clipped/self.n_miniBatch)
+
+        print("iterartion",it,self.loss_struct /self.n_miniBatch,self.loss_word /self.n_miniBatch,
+              self.loss_POS /self.n_miniBatch)
