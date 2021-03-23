@@ -52,10 +52,13 @@ class GatedFixedArityNodeEmbedder(tf.keras.Model):
             ]
         :return: [clones, batch, output_size]
         """
+        try:
+            training=kwargs["training"]
+        except:
+            training=True
         children, values = x
         concat = tf.concat([children, values], axis=-1)
-        output = self.output_f(concat)  # [batch, emb]
-
+        output = self.output_f(concat,training=training)  # [batch, emb]
         # output gatings only on children embeddings (value embedding size might be different)
         # out = g * out + (g1 * c1 + g2 * c2 ...)
         childrens = tf.reshape(children, [children.shape[0], self.arity, -1])  # [batch, arity, children_emb]
@@ -155,11 +158,14 @@ class GatedNullableInput(tf.keras.Model):
             ]
         :return: [clones, batch, output_size]
         """
+        try:
+            training=kwargs["training"]
+        except:
+            training=True
         children, values = x
         concat = tf.concat([children, values], axis=-1)
 
-        output = self.output_model(concat)
-
+        output = self.output_model(concat,training=training)
         number_of_input = children.shape[1].value // self.embedding_size
         gating_inp = tf.concat([output, concat], axis=-1)
         gatings = tf.nn.softmax(self.gating_f(gating_inp)[:, :number_of_input+1], axis=1)

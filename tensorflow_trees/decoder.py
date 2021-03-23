@@ -197,7 +197,6 @@ class Decoder(tf.keras.Model):
         self.take_root_along = take_root_along
 
         self.root_only_in_fist_LSTM_time = True
-        #self.word_module = RNN_Decoder(WordValue.embedding_size,hidden_word,WordValue.representation_shape)
         self.word_module = word_module
 
         # if not attr, they don't get registered as variable by the keras model (dunno why)
@@ -225,7 +224,7 @@ class Decoder(tf.keras.Model):
 
     def __call__(self, *,
                  encodings: tf.Tensor = None, targets: T.List[Tree] = None,     # this two lines are mutual exclusive
-                 batch: BatchOfTreesForDecoding = None,augment_fn=None, samp ):
+                 batch: BatchOfTreesForDecoding = None,augment_fn=None, training, samp ):
         """ Batched computation. All fireable operations are grouped according to node kinds and the one single aggregated
         operation is ran. Turned out to give a ~2x speedup.
         :param embeddings: [batch_size, embedding_size]
@@ -326,10 +325,10 @@ class Decoder(tf.keras.Model):
 
                 if op_id=="POS_tag":
                     infl = getattr(self, 'value_'+node_type.id)
-                    vals = infl.compiled_call(inp,training=TR)
+                    vals = infl.compiled_call(inp,training=training)
                 else:
                     vals = words_predictions(self.word_module,batch_idxs,
-                        inp,targets,TR, encodings, self.root_only_in_fist_LSTM_time,perm2usort,samp)
+                        inp,targets,training, encodings, self.root_only_in_fist_LSTM_time,perm2usort,samp)
                     #if current nodes are words, "unsort matrix contaning it i.e. go back to order expected
                     #by following code
 
@@ -354,7 +353,7 @@ class Decoder(tf.keras.Model):
                     dst = getattr(self, 'dist_' + node_type.id)
                     inf = getattr(self, 'infl_' + node_type.id)
 
-                    all_children_distribs = dst.compiled_call(inp,training=TR)  # [batch * arity, types]
+                    all_children_distribs = dst.compiled_call(inp,training=training)  # [batch * arity, types]
                     if TR:
                         node_idx = [self.all_types_idx[c.node_type_id] for o in ops for c in o.meta["target"].children]
                     else:
@@ -366,7 +365,7 @@ class Decoder(tf.keras.Model):
                     oh_distrib = tf.reshape(oh_distrib_, tf.cast([len(node_idx) / node_type.arity.value, -1], tf.int32))
                     inp = tf.concat([inp, oh_distrib], axis=-1)
 
-                    all_embeddings = inf.compiled_call(inp,training=TR) # [batch, arity * embedding_size]
+                    all_embeddings = inf.compiled_call(inp,training=training) # [batch, arity * embedding_size]
                     all_embeddings = tf.reshape(all_embeddings, [-1, self.embedding_size])
 
                     if TR:
@@ -418,7 +417,7 @@ class Decoder(tf.keras.Model):
                 dst = getattr(self, 'dist_' + node_type.id)
                 infl = getattr(self, 'infl_' + node_type.id)
 
-                distribs = dst.compiled_call(inp,training=TR)
+                distribs = dst.compiled_call(inp,training=training)
                 no_child_idx = len(self.all_types)  # special idx to stop the children generations
 
                 if TR:
@@ -445,7 +444,7 @@ class Decoder(tf.keras.Model):
                 if inp.shape[0].value > 0:  # otherwise means no more children have to be generated
                     distribs_oh = tf.one_hot(node_idx, len(self.all_types) + 1)
                     inp = tf.concat([inp, tf.boolean_mask(distribs_oh, mask, axis=0)], axis=1)
-                    embs = infl.compiled_call(inp,training=TR)    # compute the new embedding
+                    embs = infl.compiled_call(inp,training=training)    # compute the new embedding
 
                     # perform all the split at once is much more efficient then having multiple slicing
                     child, new_parent = tf.split(embs, 2, axis=1)
@@ -505,7 +504,7 @@ class Decoder(tf.keras.Model):
 
                 batch_size = inp.shape[0]
 
-                distribs = dst.compiled_call(inp,training=TR)   # [batch * cut_arity, types+1] one special types means no child
+                distribs = dst.compiled_call(inp,training=training)   # [batch * cut_arity, types+1] one special types means no child
                 no_child_idx = len(self.all_types)
                 max_children_arity = max([len(o.meta['target'].children) for o in ops]) if TR else self.max_arity
                 EXTRA_CHILD = max_children_arity > self.cut_arity
@@ -553,7 +552,7 @@ class Decoder(tf.keras.Model):
 
                 first_distribs_gt = tf.reshape(distrib_gt[:, :self.cut_arity], [batch_size, -1])
                 first_inp = tf.concat([inp, first_distribs_gt], axis=1)
-                first_embs = infl.compiled_call(first_inp, min(max_children_arity, self.cut_arity),training=TR)    #[arity, batch, embedding_size]
+                first_embs = infl.compiled_call(first_inp, min(max_children_arity, self.cut_arity),training=training)    #[arity, batch, embedding_size]
                 first_embs = tf.reshape(tf.transpose(first_embs, [1, 0, 2]), [-1, self.embedding_size]) # [batch * max_children_arity, embedding_size]
 
                 if TR:

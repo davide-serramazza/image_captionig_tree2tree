@@ -163,9 +163,9 @@ class Encoder(tf.keras.Model):
         for l in tree_def.leaves_types:
             setattr(self, 'E_'+l.id, cellsbuilder.build_embedder(l, embedding_size, name=name+"E_" + l.id))
 
-    def _c_fixed_op(self, inp, ops, network):
+    def _c_fixed_op(self, inp, ops, network,training):
 
-        res = network.optimized_call(inp)
+        res = network.optimized_call(inp,training=training)
 
         ops[0].meta['emb_batch'].scatter_update('embs', [op.meta['node_numb'] for op in ops], res)
         for op in ops:
@@ -184,7 +184,7 @@ class Encoder(tf.keras.Model):
         else:
             return tf.tuple([inp, tf.zeros([inp.shape[0], 0])])
 
-    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]]) -> BatchOfTreesForEncoding:
+    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]],training) -> BatchOfTreesForEncoding:
 
         if not type(batch) == BatchOfTreesForEncoding:
             batch = BatchOfTreesForEncoding(batch, self.embedding_size)
@@ -229,7 +229,7 @@ class Encoder(tf.keras.Model):
             if op_t == 'E':
 
                 inp = node_t.value_type.abstract_to_representation_batch([x.value.abstract_value for x in ops])
-                res = network.optimized_call(inp)
+                res = network.optimized_call(inp,training=training)
 
                 #  superfluous when node is fused
                 if node_id not in self.tree_def.fusable_nodes_id_child_parent.keys():
@@ -246,7 +246,7 @@ class Encoder(tf.keras.Model):
 
                     inp, values = self.augment_with_value(res, self.node_map[ops[0].meta['parent'].node_type_id], rec_ops)
 
-                    self._c_fixed_op([inp, values], rec_ops, network)
+                    self._c_fixed_op([inp, values], rec_ops, network,training=training)
 
             elif op_t == 'C':
                 if type(node_t.arity) == NodeDefinition.FixedArity:
@@ -254,7 +254,7 @@ class Encoder(tf.keras.Model):
                     inp = tf.reshape(inp, [len(ops), -1])
                     inp, values = self.augment_with_value(inp, node_t, ops)
 
-                    self._c_fixed_op([inp, values], ops, network)
+                    self._c_fixed_op([inp, values], ops, network,training=training)
 
                 elif type(node_t.arity) == NodeDefinition.VariableArity and not self.use_flat_strategy:
                     # TODO rnn (e.g. lstm) ?
@@ -266,7 +266,7 @@ class Encoder(tf.keras.Model):
                     inp = tf.reshape(inp, [len(ops), -1])
                     inp, values = self.augment_with_value(inp, node_t, ops) # TODO test
 
-                    res = network.optimized_call([inp, values])
+                    res = network.optimized_call([inp, values],training=training)
 
                     k = ('C', node_id)
                     if k not in all_ops.keys():
@@ -322,7 +322,7 @@ class Encoder(tf.keras.Model):
                     inp = tf.reshape(inp, [len(ops), first_arity * self.embedding_size])
                     inp = tf.concat([inp, extra_children], axis=1)
                     inp, values = self.augment_with_value(inp, node_t, ops)
-                    res = network.optimized_call([inp, values])
+                    res = network.optimized_call([inp, values],training=training)
 
                     batch.scatter_update('embs',
                                          [op.meta['node_numb'] for op in ops],
