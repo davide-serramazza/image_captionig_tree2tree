@@ -169,96 +169,55 @@ class NIC_Decoder(tf.keras.Model):
         return to_return
 
     def beam_search(self,features,pos_embs):
-        def first_word_predition(imgs):
-            imgs = tf.expand_dims(imgs,axis=1)
-            rnn_inputs = imgs #TODO pos?
-            # run predictions and states update
-            states = [tf.zeros(shape=(pos_embs.shape[0], self.units))] * 2
-            rnn_output,state_h,state_c = self.rnn(rnn_inputs, initial_state = states, training=False)
-            states=[state_h,state_c]
-            activations = self.final_layer(rnn_output)
-            predictions = tf.nn.softmax(activations,axis=-1)
-            beam_ris = tf.math.top_k(predictions,k=20)
-            dict = {"current_sequences" : [] , "current_probs" : [], "states" : []}
-            for j in range(self.beam):
-                dict["current_sequences"].append(beam_ris.indices[:,:,j])
-                dict["current_probs"].append(beam_ris.values[:,:,j])
-                dict["states"].append(states)
-            return  dict
+        def first_words_pred(features, i):
+            rnn_input = tf.expand_dims(tf.expand_dims(features[i], axis=0), axis=0)
+            states = [tf.zeros(shape=(1, self.units))] * 2 # initial states are zero vectors
+            rnn_output, state_h, state_c = self.rnn(rnn_input, initial_state=states, training=False)
+            states = [[state_h, state_c]] * self.beam
+            predictions = tf.nn.softmax(self.final_layer(rnn_output), axis=-1)
+            beam_ris = tf.math.top_k(predictions, k=self.beam)
 
-        def single_beam_run(beam_current_results):
-            current_run_states = []
-            current_k_forward = []
-            extended_sequences = []
-            for j in range(self.beam):
-                prew_words = self.embedding_layer(beam_current_results['current_sequences'][j])
-                rnn_inputs = prew_words  #TODO pos?
-                rnn_output,state_h,state_c = self.rnn(rnn_inputs, initial_state = beam_current_results['states'][j], training=False)
-                current_run_states.append([state_h,state_c])
+            new_sequencies = []
+            for k in range(self.beam):
+                new_sequencies.append([beam_ris.indices[0][0][k]])
+            current_pred = (new_sequencies, tf.math.log(beam_ris.values[0][0]))
+            return current_pred, states
 
-                activations=self.final_layer(rnn_output)
-                predictions = tf.nn.softmax(activations,axis=-1)
-                current_k_forward.append(predictions)
+        def beam_update(beam, beam_ris, current_pred, current_states):
+            new_sequencies = []
+            new_states = []
+            for k in range(beam):
+                idx = beam_ris.indices[0][0][k] % self.vocab_size
+                run = int(tf.math.floor((beam_ris.indices[0][0][k] / self.vocab_size)))
+                new_sequencies.append(copy.deepcopy(current_pred[0][run]))
+                new_sequencies[-1].append(idx)
+                new_states.append(current_states[run])
+            tmp = (new_sequencies, beam_ris.values[0][0])
+            return tmp, new_states
 
-            total_run_predictions = tf.concat([t for t in current_k_forward],axis=-1)
-            beam_ris = tf.math.top_k(total_run_predictions,k=20)
-            for b in range(self.beam):
-                for s in range(n_sentences):
-                    idx = beam_ris.indices[s][0][b]
-                    run = idx/self.vocab_size
-                    print(run)
-            a = 3
-
-
-
-
-
+        def single_beam_step(current_pred, states):
+            total_predictions = []
+            current_states = []
+            for k in range(self.beam):
+                prev_word = (current_pred[0][k])
+                prev_word_embedding = tf.expand_dims(tf.expand_dims(self.embedding_layer(prev_word[-1]), axis=0), axis=0)
+                rnn_output, state_h, state_c = self.rnn(prev_word_embedding, initial_state=states[k], training=False)
+                current_states.append([state_h, state_c])
+                predictions = tf.nn.softmax( self.final_layer(rnn_output), axis=-1)
+                total_predictions.append(tf.math.log(predictions) + current_pred[1][k])
+            total_predictions = tf.concat([t for t in total_predictions], axis=-1)
+            beam_ris = tf.math.top_k(total_predictions, k=self.beam)
+            return beam_ris, current_states
 
         final_pred = []
         max_length = pos_embs.shape[1]
         n_sentences = features.shape[0]
         for i in range(n_sentences):
-            print(i)
-            current_pred = []
-            rnn_input =  tf.expand_dims(tf.expand_dims(features[i],axis=0),axis=0)
-            states = [tf.zeros(shape=(1, self.units))] * 2
-            rnn_output,state_h,state_c = self.rnn(rnn_input, initial_state = states, training=False)
-            states=[[state_h,state_c]]*self.beam
-            activations = self.final_layer(rnn_output)
-            predictions = tf.nn.softmax(activations,axis=-1)
-            beam_ris = tf.math.top_k(predictions,k=self.beam)
-            new_sequencies = []
-            for k in range(self.beam):
-                new_sequencies.append([beam_ris.indices[0][0][k]])
-            current_pred = (new_sequencies,tf.math.log(beam_ris.values[0][0]))
-
+            current_pred, states = first_words_pred(features, i)
 
             for j in range(max_length-1):
-                new_sequencies = []
-                new_probs = []
-                new_states = []
-                total_predictions = []
-                current_states = []
-                for k in range(self.beam):
-                    prev_word = (current_pred[0][k])
-                    prev_word_embedding = tf.expand_dims(tf.expand_dims(self.embedding_layer(prev_word[-1]),axis=0),axis=0)
-                    rnn_output,state_h,state_c = self.rnn(prev_word_embedding, initial_state = states[k], training=False)
-                    current_states.append([state_h,state_c])
-                    activations = self.final_layer(rnn_output)
-                    predictions = tf.nn.softmax(activations,axis=-1)
-                    total_predictions.append(tf.math.log(predictions)+current_pred[1][k])
-                total_predictions = tf.concat([t for t in total_predictions],axis=-1)
-                beam_ris = tf.math.top_k(total_predictions,k=self.beam)
-                for k in range(self.beam):
-                    idx = beam_ris.indices[0][0][k]%self.vocab_size
-                    run =  int(tf.math.floor((beam_ris.indices[0][0][k]/self.vocab_size)))
-                    new_sequencies.append(copy.deepcopy(current_pred[0][run]))
-                    new_sequencies[-1].append(idx)
-                    new_states.append(current_states[run])
-
-                tmp = (new_sequencies,beam_ris.values[0][0])
-                current_pred = tmp
-                states = new_states
+                beam_ris, current_states = single_beam_step(current_pred, states)
+                current_pred, states = beam_update(self.beam,beam_ris, current_pred, current_states)
 
             best_idx = tf.math.argmax(current_pred[1])
             #best idx è sempre 0?
@@ -267,6 +226,9 @@ class NIC_Decoder(tf.keras.Model):
         #si può fare anche senza one-hot?
         final_pred = tf.one_hot(final_pred,depth=self.vocab_size)
         return final_pred
+
+
+
 
 """
         beam_current_results = first_word_predition(features)

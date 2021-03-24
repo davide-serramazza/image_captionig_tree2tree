@@ -100,12 +100,39 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                           " loss validation word is ", loss_values_validation["word"], " loss validation POS is ", loss_values_validation["POS_tag"])
 
                     #get unsupervised validation loss
+
+
+                    #sampling
                     batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True)
                     pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
-                    batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=False)
+                    bleu_1 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1.0,))
+                    bleu_2 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.5,0.5))
+                    bleu_3 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1/3,1/3,1/3))
+                    bleu_4 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.25,0.25,0.25,0.25))
+                    print("sampling" , bleu_1, bleu_2, bleu_3,bleu_4)
+                    tfs.scalar("bleu/blue-1", bleu_1)
+                    tfs.scalar("bleu/blue-2", bleu_2)
+                    tfs.scalar("bleu/blue-3", bleu_3)
+                    tfs.scalar("bleu/blue-4", bleu_4)
+
+
+
+                    #beam
+                    batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)
+                    pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees)
+                    bleu_1_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1.0,))
+                    bleu_2_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.5,0.5))
+                    bleu_3_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1/3,1/3,1/3))
+                    bleu_4_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.25,0.25,0.25,0.25))
+                    tfs.scalar("bleu/blue-1_b", bleu_1_b)
+                    tfs.scalar("bleu/blue-2_b", bleu_2_b)
+                    tfs.scalar("bleu/blue-3_b", bleu_3_b)
+                    tfs.scalar("bleu/blue-4_b", bleu_4_b)
+                    print("beam" , bleu_1_b, bleu_2_b, bleu_3_b,bleu_4_b, "\n")
+
+
                     s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
                         Tree.compare_trees(target_val, batch_unsuperv.decoded_trees)
-                    pred_sentences_b = extract_words_from_tree(batch_unsuperv.decoded_trees)
                     tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
                     tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
                     tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
@@ -113,23 +140,9 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
                     tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
                 else:
-                    a = 2
-                bleu_1 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1.0,))
-                bleu_2 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.5,0.5))
-                bleu_3 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1/3,1/3,1/3))
-                bleu_4 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.25,0.25,0.25,0.25))
-                tfs.scalar("bleu/blue-1", bleu_1)
-                tfs.scalar("bleu/blue-2", bleu_2)
-                tfs.scalar("bleu/blue-3", bleu_3)
-                tfs.scalar("bleu/blue-4", bleu_4)
-                bleu_1 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1.0,))
-                bleu_2 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.5,0.5))
-                bleu_3 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1/3,1/3,1/3))
-                bleu_4 = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.25,0.25,0.25,0.25))
-                tfs.scalar("bleu/blue-1_b", bleu_1)
-                tfs.scalar("bleu/blue-2_b", bleu_2)
-                tfs.scalar("bleu/blue-3_b", bleu_3)
-                tfs.scalar("bleu/blue-4_b", bleu_4)
+                    a=2
+
+
 
                 if tree_decoder:
                     print("iteration ", i, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
