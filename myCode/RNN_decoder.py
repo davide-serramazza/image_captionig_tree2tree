@@ -173,7 +173,7 @@ class NIC_Decoder(tf.keras.Model):
             rnn_input = tf.expand_dims(tf.expand_dims(features[i], axis=0), axis=0)
             states = [tf.zeros(shape=(1, self.units))] * 2 # initial states are zero vectors
             rnn_output, state_h, state_c = self.rnn(rnn_input, initial_state=states, training=False)
-            states = [[state_h, state_c]] * self.beam
+            states = [tf.concat([t for t in [state_h]*self.beam],axis=0), tf.concat([t for t in [state_c]*self.beam],axis=0)]
             predictions = tf.nn.softmax(self.final_layer(rnn_output), axis=-1)
             beam_ris = tf.math.top_k(predictions, k=self.beam)
 
@@ -183,31 +183,36 @@ class NIC_Decoder(tf.keras.Model):
             current_pred = (new_sequencies, tf.math.log(beam_ris.values[0][0]))
             return current_pred, states
 
-        def beam_update(beam, beam_ris, current_pred, current_states):
+        def beam_update(beam, beam_ris, current_pred, states_h,states_c):
             new_sequencies = []
-            new_states = []
+            new_states_h = []
+            new_states_c = []
             for k in range(beam):
-                idx = beam_ris.indices[0][0][k] % self.vocab_size
-                run = int(tf.math.floor((beam_ris.indices[0][0][k] / self.vocab_size)))
+                idx = beam_ris.indices[k] % self.vocab_size
+                run = int(tf.math.floor((beam_ris.indices[k] / self.vocab_size)))
                 new_sequencies.append(copy.deepcopy(current_pred[0][run]))
                 new_sequencies[-1].append(idx)
-                new_states.append(current_states[run])
-            tmp = (new_sequencies, beam_ris.values[0][0])
+                new_states_h.append(tf.gather(states_h,run))
+                new_states_c.append(tf.gather(states_c,run))
+            tmp = (new_sequencies, beam_ris.values)
+            new_states = [tf.convert_to_tensor(new_states_h), tf.convert_to_tensor(new_states_c)]
             return tmp, new_states
 
         def single_beam_step(current_pred, states):
-            total_predictions = []
-            current_states = []
+            a = tf.convert_to_tensor(current_pred[0])
+            b = a[:,-1]
+            prev_word_embedding = tf.expand_dims(self.embedding_layer(b),axis=1)
+            rnn_output, state_h, state_c = self.rnn(prev_word_embedding, initial_state=states, training=False)
+            predictions = tf.nn.softmax( self.final_layer(rnn_output), axis=-1)
+            log_preds = tf.math.log(tf.squeeze(predictions))
+
+            tot_preds = []
             for k in range(self.beam):
-                prev_word = (current_pred[0][k])
-                prev_word_embedding = tf.expand_dims(tf.expand_dims(self.embedding_layer(prev_word[-1]), axis=0), axis=0)
-                rnn_output, state_h, state_c = self.rnn(prev_word_embedding, initial_state=states[k], training=False)
-                current_states.append([state_h, state_c])
-                predictions = tf.nn.softmax( self.final_layer(rnn_output), axis=-1)
-                total_predictions.append(tf.math.log(predictions) + current_pred[1][k])
-            total_predictions = tf.concat([t for t in total_predictions], axis=-1)
-            beam_ris = tf.math.top_k(total_predictions, k=self.beam)
-            return beam_ris, current_states
+                tot_preds.append(log_preds[k]+current_pred[1][k])
+
+            tot_preds = tf.concat([t for t in tot_preds],axis=-1)
+            beam_ris = tf.math.top_k(tot_preds, k=self.beam)
+            return beam_ris, state_h,state_c
 
         final_pred = []
         max_length = pos_embs.shape[1]
@@ -216,8 +221,8 @@ class NIC_Decoder(tf.keras.Model):
             current_pred, states = first_words_pred(features, i)
 
             for j in range(max_length-1):
-                beam_ris, current_states = single_beam_step(current_pred, states)
-                current_pred, states = beam_update(self.beam,beam_ris, current_pred, current_states)
+                beam_ris, current_states_h,current_states_c = single_beam_step(current_pred, states)
+                current_pred, states = beam_update(self.beam,beam_ris, current_pred, current_states_h,current_states_c)
 
             best_idx = tf.math.argmax(current_pred[1])
             #best idx è sempre 0?

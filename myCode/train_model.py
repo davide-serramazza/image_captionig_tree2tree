@@ -88,7 +88,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     batch_val_enc = batch_val_enc.get_root_embeddings()
 
                 if tree_decoder:
-                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,training=False,samp=False)
+                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,training=False,samp=True)
                     loss_struct_val, loss_values_validation = batch_val_dec.reconstruction_loss()
                     loss_validation = loss_struct_val + loss_values_validation["POS_tag"]+loss_values_validation["word"]
                     tfs.scalar("loss/validation/loss_struc", loss_struct_val)
