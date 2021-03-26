@@ -128,7 +128,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     tfs.scalar("bleu/blue-2_b", bleu_2_b)
                     tfs.scalar("bleu/blue-3_b", bleu_3_b)
                     tfs.scalar("bleu/blue-4_b", bleu_4_b)
-                    print("beam" , bleu_1_b, bleu_2_b, bleu_3_b,bleu_4_b, "\n")
+                    print("beam    " , bleu_1_b, bleu_2_b, bleu_3_b,bleu_4_b, "\n")
 
 
                     s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
