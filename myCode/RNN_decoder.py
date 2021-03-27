@@ -168,7 +168,8 @@ class NIC_Decoder(tf.keras.Model):
         to_return = tf.concat([item for item in to_return],axis=1)
         return to_return
 
-    def beam_search(self,features,pos_embs):
+    def beam_search(self,features,pos_embs,sentences_len):
+        # helper functions
         def first_words_pred(features):
             # get sentences number and expand image features
             n_sentences = features.shape[0]
@@ -186,14 +187,16 @@ class NIC_Decoder(tf.keras.Model):
                 new_sequences.append([])
                 for k in range(self.beam):
                     new_sequences[-1].append([beam_ris.indices[n][0][k]])
+
             # update states for the next iteration
-            states = [tf.tile(state_h,[self.beam,1]) ,tf.tile(state_c,[self.beam,1]) ]
+            idxs = [i for i in range(n_sentences) for j in range(self.beam)]
+            states = [tf.gather(state_h,idxs) ,tf.gather(state_c,idxs) ]
 
             # save in a pair current computed sequences and their probability
-            current_preds = (new_sequences, tf.squeeze(tf.math.log(beam_ris.values)))
+            current_preds = (new_sequences, tf.squeeze(tf.math.log(beam_ris.values  )))
             return current_preds, tf.squeeze(beam_ris.indices),states
 
-        def beam_update(beam, beam_ris, current_seqs, states_h,states_c):
+        def beam_update(beam_ris, current_seqs, states_h,states_c):
             new_sequencies = []
             new_states_h = []
             new_states_c = []
@@ -201,7 +204,7 @@ class NIC_Decoder(tf.keras.Model):
             #TODO capire se si può vettorizzare la cosa
             for n in range(n_sentences):
                 new_sequencies.append([])
-                for k in range(beam):
+                for k in range(self.beam):
                     idx = beam_ris.indices[n][k] % self.vocab_size
                     run = int(tf.math.floor((beam_ris.indices[n][k] / self.vocab_size)))
                     new_sequencies[-1].append(copy.deepcopy(current_seqs[0][n][run]))
@@ -213,8 +216,9 @@ class NIC_Decoder(tf.keras.Model):
             new_states = [tf.convert_to_tensor(new_states_h), tf.convert_to_tensor(new_states_c)]
             return tmp, new_states, last_words
 
-        def single_beam_step(current_seqs,last_words,states):
+        def single_beam_step(current_seqs,last_words,states,sen_len_offsets):
             # reshape last words from (n_sentence,beam) to (n_sentence*beam,1) in order perform a single call to rnn
+            #TODO questo reshape spostarlo in dove si produce il vettore delle parole successive
             last_words = tf.reshape(last_words,shape=[-1,1])
             # get relative embedding and call rnn
             prev_word_embedding = self.embedding_layer(last_words)
@@ -224,7 +228,7 @@ class NIC_Decoder(tf.keras.Model):
             predictions = tf.nn.softmax(self.final_layer(rnn_output), axis=-1)
             log_preds = tf.math.log(tf.squeeze(predictions))
 
-            #capire se si può migliorare sta chifezza
+            #TODO capire se si può migliorare sta chifezza guardare tf.stack tk.unstack tf.split , tf.slice
             tot_preds = []
             for n in range(predictions.shape[0]):
                 tot_preds.append([])
@@ -237,17 +241,20 @@ class NIC_Decoder(tf.keras.Model):
             beam_ris = tf.math.top_k(tot_preds, k=self.beam,sorted=True)
             return beam_ris, state_h,state_c
 
+
+        # main function
         final_pred = []
         max_length = pos_embs.shape[1]
         current_seqs, last_words,states = first_words_pred(features)
 
-        for j in range(max_length-1):
-            beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words, states)
-            current_seqs, states,last_words = beam_update(self.beam, beam_ris, current_seqs, current_states_h,
-                                                   current_states_c)
+        for j in range(1,max_length):
+            sen_len_offset = sentences_len-j
+            beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words, states,sen_len_offset)
+            current_seqs, states,last_words = beam_update(beam_ris, current_seqs, current_states_h,current_states_c)
 
         for el in current_seqs[0]:
             final_pred.append(el[0])
+        print(tf.argmax(current_seqs[1],axis=1))
         final_pred = tf.convert_to_tensor(final_pred)
         #si può fare anche senza one-hot?
         final_pred = tf.one_hot(final_pred,depth=self.vocab_size)

@@ -84,7 +84,7 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
         if samp:
             predictions = word_module.sampling(roots_emb,inputs)
         else:
-            predictions =  word_module.beam_search(roots_emb,inputs)
+            predictions =  word_module.beam_search(roots_emb,inputs,sentences_len)
     #unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort)
     return vals
@@ -178,9 +178,9 @@ def get_sentences_length(batch_idxs,TR):
     :param batch_idxs:
     :return:
     """
+    sentences_len = []
     if TR:
         current_tree = 0
-        sentences_len = []
         current_len = 0
         for el in batch_idxs:
             if el == current_tree:
@@ -191,12 +191,11 @@ def get_sentences_length(batch_idxs,TR):
                 current_len = 1
         sentences_len.append(current_len)
     else:
-        sentences_len = []
         n_sentences = np.max(batch_idxs)+1
         for i in range(n_sentences):
             sentences_len.append(batch_idxs.count(i))
     assert np.sum(sentences_len) == len(batch_idxs)
-    return sentences_len
+    return np.asarray(sentences_len)
 
 def get_ordered_leafs(tree, l : list):
     """
