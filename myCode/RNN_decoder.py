@@ -189,60 +189,76 @@ class NIC_Decoder(tf.keras.Model):
             states = [tf.gather(state_h,idxs) ,tf.gather(state_c,idxs) ]
 
             # save in a pair current computed sequences and their probability
-            current_preds = (new_sequences, tf.squeeze(tf.math.log(beam_ris.values)) )
+            current_preds = {
+                'k_sequences' : new_sequences,
+                'probs' : tf.squeeze(tf.math.log(beam_ris.values)),
+                'computed_seqs' : [],
+                'computed_idxs' : [],
+                'pred_probs' : []}
             return current_preds, tf.reshape(beam_ris.indices,shape=[-1,1]), states
 
-        def beam_update(beam_ris, current_seqs, states_h,states_c):
+        def beam_update(beam_ris, current_seqs,sen_len_offset, max_length,states_h,states_c):
             n_sentences = beam_ris.indices.shape[0]
-
+            sen_len_offset = sen_len_offset-1
 
             current_pred_words = tf.unstack(beam_ris.indices % self.vocab_size)
             current_runs = tf.cast(tf.math.floor(beam_ris.indices / self.vocab_size),dtype=tf.int32)
-            prev_sequencies = [tf.gather(current_seqs[0][i],current_runs[i]) for i in range(n_sentences)]
+            prev_sequencies = [tf.gather(current_seqs['k_sequences'][i],current_runs[i]) for i in range(n_sentences)]
             new_sequencies =[tf.concat([ prev , tf.expand_dims(curr,axis=-1) ],axis=-1) for (prev,curr) in
                              zip(prev_sequencies,current_pred_words)]
 
-
+            computed_seqs =tf.reshape(tf.where(tf.equal(sen_len_offset,0)),shape=([-1]))
+            for i in computed_seqs:
+                predicted = new_sequencies[i][0]
+                len = predicted.shape[0]
+                current_seqs['computed_seqs'].append(tf.pad(predicted,[[0,max_length-len]],'CONSTANT'))
+                current_seqs['computed_idxs'].append(i)
+                current_seqs['pred_probs'].append(current_seqs['probs'][i][0])
             states_idxs = [current_runs[i]+i*self.beam for i in range(n_sentences)]
             states_idxs = tf.concat([t for t in states_idxs],axis=-1)
             new_states = [tf.gather(states_h,states_idxs),tf.gather(states_c,states_idxs)]
-
             last_words = tf.reshape(beam_ris.indices%self.vocab_size,shape=(-1,1))
-            tmp = (tf.convert_to_tensor(new_sequencies), beam_ris.values)
-            return tmp, new_states, last_words
+            current_seqs['k_sequences'] = tf.convert_to_tensor(new_sequencies)
+            current_seqs['probs'] = beam_ris.values
+            return current_seqs, new_states, last_words,sen_len_offset
 
         def single_beam_step(current_seqs,last_words,states,sen_len_offsets):
             # get relative embedding and call rnn
             n_sens = sen_len_offsets.shape[0]
 
+            # from embedding to predictions
             prev_word_embedding = self.embedding_layer(last_words)
             rnn_output, state_h, state_c = self.rnn(prev_word_embedding, initial_state=states, training=False)
-            # reshaping rnn_output into (n_sentence,beam,n_rnn_units); then get predictions
-            rnn_output =tf.reshape(rnn_output,shape=(-1,self.beam,self.units))
             predictions = tf.nn.softmax(self.final_layer(rnn_output), axis=-1)
+            # reshape preds as (n_sens, beam,vocab_dim)  and get logarithm
+            predictions =tf.reshape(predictions,shape=(-1,self.beam,self.vocab_size))
             log_preds = tf.math.log(tf.squeeze(predictions))
 
             # compute current sentence probabilities
-            current_probs = tf.expand_dims(current_seqs[1],axis=-1)
-            current_probs = tf.tile(current_probs,[1,1,self.vocab_size])
-            tot_preds = tf.reshape((log_preds+current_probs),shape=(n_sens,-1))
+            prev_probs = tf.expand_dims(current_seqs['probs'],axis=-1)
+            prev_probs = tf.tile(prev_probs,[1,1,self.vocab_size])
+            current_preds = tf.reshape((log_preds+prev_probs),shape=(n_sens,-1))
 
             # perform beam search
-            beam_ris = tf.math.top_k(tot_preds, k=self.beam,sorted=True)
+            beam_ris = tf.math.top_k(current_preds, k=self.beam,sorted=True)
             return beam_ris, state_h,state_c
 
 
         # main function
-        max_length = pos_embs.shape[1]
+        max_length = max(sentences_len)
+        assert min(sentences_len)>=2
         current_seqs, last_words,states = first_words_pred(features)
+        sen_len_offset = sentences_len-1
 
         for j in range(1,max_length):
-            sen_len_offset = sentences_len-j
             beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words, states,sen_len_offset)
-            current_seqs, states,last_words = beam_update(beam_ris, current_seqs, current_states_h,current_states_c)
+            current_seqs, states,last_words, sen_len_offset = \
+                beam_update(beam_ris, current_seqs,sen_len_offset,max_length, current_states_h,current_states_c,)
 
-        final_pred = current_seqs[0][:,0,:]
-        print(tf.reduce_mean(tf.math.exp(current_seqs[1][:,0])))
+        final_pred = tf.convert_to_tensor(current_seqs['computed_seqs'])
+        idxs = tf.convert_to_tensor(current_seqs['computed_idxs'])
+        final_pred = tf.gather(final_pred,idxs)
+        print(tf.reduce_mean(tf.math.exp(current_seqs['pred_probs'])))
         #si può fare anche senza one-hot?
         final_pred = tf.one_hot(final_pred,depth=self.vocab_size)
         return final_pred

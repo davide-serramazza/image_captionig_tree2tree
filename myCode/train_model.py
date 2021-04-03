@@ -39,7 +39,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     batch_enc = encoder(current_batch_input,training=True)
                     root_emb = batch_enc.get_root_embeddings() if tree_encoder else batch_enc
                     if tree_decoder:
-                        batch_dec = decoder(encodings=root_emb, targets=current_batch_target,training=True,samp=False)
+                        batch_dec = decoder(encodings=root_emb, targets=current_batch_target,training=True,samp=True)
                         # compute global loss
                         loss_struct_miniBatch, loss_values_miniBatch = batch_dec.reconstruction_loss()
                         loss_value__miniBatch = loss_values_miniBatch["POS_tag"] + loss_values_miniBatch["word"]

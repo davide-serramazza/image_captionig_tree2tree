@@ -28,8 +28,8 @@ def main():
     parser.add_argument('lambd', type=float, help="coefficient of penalization on encoder representation")
     parser.add_argument('beta', type=float, help="coefficient for L2 reg.")
     parser.add_argument('hidden_coeff', type=float, help="coefficient for hidden dimension of encoder and decoder layer")
-    learning_rate = 0.0001
-    clipping = 0.02
+    learning_rate = 0.00003
+    clipping = 0.01
     batch_size = 32
     parser.add_argument('rnn_unit_size', type=int, help="size of rnn expressed as coefficient relative to embedding size")
     parser.add_argument('drop_rate', type=float, help="drop rate for hidden layers")
