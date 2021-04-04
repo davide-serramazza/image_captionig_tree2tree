@@ -117,4 +117,5 @@ def extraxt_topK_words(word_occ,filters):
     tokenizer.index_word[0] = '<pad>'
     print("voab dim is ",top_k)
     shared_list.tokenizer = tokenizer
-    WordValue.update_rep_shape(top_k)
+    # top_k+2 because need to add <pad> and <unk> token
+    WordValue.update_rep_shape(top_k+2)

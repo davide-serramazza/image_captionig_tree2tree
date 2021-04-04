@@ -86,7 +86,7 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
         else:
             predictions =  word_module.beam_search(roots_emb,inputs,sentences_len)
     #unzip data (reshape as 2D matrix)
-    vals = unzip_data(predictions,sentences_len,perm2unsort)
+    vals = unzip_data(predictions,sentences_len,perm2unsort,samp)
     return vals
 
 #TODO handle root in each time stamp
@@ -138,7 +138,7 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
     return padded_input, targets_padded_sentences
 
 
-def unzip_data(predictions,sentences_len,perm2unsort):
+def unzip_data(predictions,sentences_len,perm2unsort,samp):
     """
     function to unzip rnn result i.e. go back in representation as 2D matrix and go back to previous order of nodes
     :param predictions:
@@ -146,16 +146,25 @@ def unzip_data(predictions,sentences_len,perm2unsort):
     :param perm2unsort:
     :return:
     """
-    vals = []
-    for i in range (len(sentences_len)):
-        current_sen_padded =predictions[i]
-        current_sen = current_sen_padded[0:sentences_len[i]]
-        vals.append(current_sen)
-    vals = tf.concat([item for item in vals],axis=0)
-    vals = tf.gather(vals, perm2unsort)
-    assert np.sum(sentences_len) == vals.shape[0]
-    return vals
+    def unzip_sampling(predictions,sentences_len,perm2unsort):
+        vals = []
+        for i in range (len(sentences_len)):
+            current_sen_padded =predictions[i]
+            current_sen = current_sen_padded[0:sentences_len[i]]
+            vals.append(current_sen)
+        vals = tf.concat([item for item in vals],axis=0)
+        vals = tf.gather(vals, perm2unsort)
+        assert np.sum(sentences_len) == vals.shape[0]
+        return vals
 
+    def unzip_beam(predictions,perm2unsort):
+        vals = tf.concat([t for t in predictions],axis=0)
+        assert  vals.shape[0]==perm2unsort.shape[0]
+        vals = tf.gather(vals, perm2unsort)
+        return vals
+
+    vals =  unzip_sampling(predictions,sentences_len,perm2unsort) if samp else unzip_beam(predictions,perm2unsort)
+    return vals
 
 #######################
 #helper functions

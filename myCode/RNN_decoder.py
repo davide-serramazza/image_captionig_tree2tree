@@ -1,5 +1,5 @@
 import tensorflow as tf
-import copy
+import numpy as np
 #TODO unica attention
 
 class BahdanauAttention(tf.keras.Model):
@@ -197,29 +197,34 @@ class NIC_Decoder(tf.keras.Model):
                 'pred_probs' : []}
             return current_preds, tf.reshape(beam_ris.indices,shape=[-1,1]), states
 
-        def beam_update(beam_ris, current_seqs,sen_len_offset, max_length,states_h,states_c):
+        def beam_update(beam_ris, current_seqs,sen_len_offset,states_h,states_c):
+            # get number of sentences and their 'length offset'
             n_sentences = beam_ris.indices.shape[0]
             sen_len_offset = sen_len_offset-1
 
+            # update previous k sequences of length n-1 with the new computed words to rich length n
             current_pred_words = tf.unstack(beam_ris.indices % self.vocab_size)
             current_runs = tf.cast(tf.math.floor(beam_ris.indices / self.vocab_size),dtype=tf.int32)
             prev_sequencies = [tf.gather(current_seqs['k_sequences'][i],current_runs[i]) for i in range(n_sentences)]
             new_sequencies =[tf.concat([ prev , tf.expand_dims(curr,axis=-1) ],axis=-1) for (prev,curr) in
                              zip(prev_sequencies,current_pred_words)]
 
-            computed_seqs =tf.reshape(tf.where(tf.equal(sen_len_offset,0)),shape=([-1]))
-            for i in computed_seqs:
+            # save the sequences which have reached their length
+            computed_seqs = np.where(sen_len_offset==0)
+            for i in computed_seqs[0]:
                 predicted = new_sequencies[i][0]
-                len = predicted.shape[0]
-                current_seqs['computed_seqs'].append(tf.pad(predicted,[[0,max_length-len]],'CONSTANT'))
+                current_seqs['computed_seqs'].append(predicted)#tf.pad(predicted,[[0,max_length-len]],'CONSTANT'))
                 current_seqs['computed_idxs'].append(i)
                 current_seqs['pred_probs'].append(current_seqs['probs'][i][0])
+
+            # keep track of RNN states, sequences and related probabilities and last words for the next iterations
             states_idxs = [current_runs[i]+i*self.beam for i in range(n_sentences)]
             states_idxs = tf.concat([t for t in states_idxs],axis=-1)
             new_states = [tf.gather(states_h,states_idxs),tf.gather(states_c,states_idxs)]
             last_words = tf.reshape(beam_ris.indices%self.vocab_size,shape=(-1,1))
             current_seqs['k_sequences'] = tf.convert_to_tensor(new_sequencies)
             current_seqs['probs'] = beam_ris.values
+
             return current_seqs, new_states, last_words,sen_len_offset
 
         def single_beam_step(current_seqs,last_words,states,sen_len_offsets):
@@ -253,14 +258,19 @@ class NIC_Decoder(tf.keras.Model):
         for j in range(1,max_length):
             beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words, states,sen_len_offset)
             current_seqs, states,last_words, sen_len_offset = \
-                beam_update(beam_ris, current_seqs,sen_len_offset,max_length, current_states_h,current_states_c,)
+                beam_update(beam_ris, current_seqs,sen_len_offset, current_states_h,current_states_c,)
 
-        final_pred = tf.convert_to_tensor(current_seqs['computed_seqs'])
-        idxs = tf.convert_to_tensor(current_seqs['computed_idxs'])
-        final_pred = tf.gather(final_pred,idxs)
+        #final_pred = tf.convert_to_tensor(current_seqs['computed_seqs'])
+        #idxs = tf.convert_to_tensor(current_seqs['computed_idxs'])
+        idxs = np.argsort(current_seqs['computed_idxs'])
+        preds = current_seqs['computed_seqs']
+        final_pred = [tf.one_hot(preds[i],depth=self.vocab_size) for i in idxs]
+        for i in range(len(sentences_len)):
+            assert  final_pred[i].shape[0]==sentences_len[i]
+        #final_pred = tf.gather(final_pred,idxs)
         print(tf.reduce_mean(tf.math.exp(current_seqs['pred_probs'])))
         #si può fare anche senza one-hot?
-        final_pred = tf.one_hot(final_pred,depth=self.vocab_size)
+        #final_pred = tf.one_hot(final_pred,depth=self.vocab_size)
         return final_pred
 
 
