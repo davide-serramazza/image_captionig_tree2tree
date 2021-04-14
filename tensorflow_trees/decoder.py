@@ -196,7 +196,6 @@ class Decoder(tf.keras.Model):
 
         self.take_root_along = take_root_along
 
-        self.root_only_in_fist_LSTM_time = True
         self.word_module = word_module
 
         # if not attr, they don't get registered as variable by the keras model (dunno why)
@@ -290,7 +289,7 @@ class Decoder(tf.keras.Model):
             ops = all_ops.pop(op_id)
             all_ops[op_id] = []
             if len(ops) == 0:
-                #eventually compute words
+                # eventually compute words
                 op_id = "word"
                 node_type = self.all_types[self.all_types_idx[op_id]]
                 try:
@@ -327,8 +326,7 @@ class Decoder(tf.keras.Model):
                     infl = getattr(self, 'value_'+node_type.id)
                     vals = infl.compiled_call(inp,training=training)
                 else:
-                    vals = words_predictions(self.word_module,batch_idxs,
-                        inp,targets,training, encodings, self.root_only_in_fist_LSTM_time,perm2usort,samp)
+                    vals = words_predictions(self.word_module,batch_idxs,inp,targets,TR, encodings,perm2usort,samp)
                     #if current nodes are words, "unsort matrix contaning it i.e. go back to order expected
                     #by following code
 

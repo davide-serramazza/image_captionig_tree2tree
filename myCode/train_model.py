@@ -102,7 +102,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     #get unsupervised validation loss
 
 
-                    #sampling
+                    # sampling
                     batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True)
                     pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
                     bleu_1 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1.0,))
@@ -117,7 +117,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
 
 
-                    #beam
+                    # beam
                     batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)
                     pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees)
                     bleu_1_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1.0,))
@@ -139,9 +139,6 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     tfs.scalar("overlaps/unsupervised/matched_POS", matched_pos_uns)
                     tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
                     tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
-                else:
-                    a=2
-
 
 
                 if tree_decoder:

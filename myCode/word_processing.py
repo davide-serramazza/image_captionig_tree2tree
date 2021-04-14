@@ -55,8 +55,7 @@ def get_ordered_nodes(embeddings, ops,TR, trees):
 #########################
 #functions used in words prediction
 #######################
-def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
-                      root_only_in_fist_LSTM_time,perm2unsort,samp):
+def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,perm2unsort,samp):
     """
     function taking care of the wall word prediction (it calls several other functions)
     :param embedding:
@@ -67,30 +66,29 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
     :param targets:
     :param TR:
     :param roots_emb:
-    :param root_only_in_fist_LSTM_time:
     :param perm2unsort:
     :param n_it: current iteration number
     :return:
     """
-    #take sentences length
+    # take sentences length
     sentences_len = get_sentences_length(batch_idxs,TR)
-    #prepare data (reshape as expected)
-    inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time)
+    # prepare data (reshape as expected)
+    inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR)
     if TR:
-        #if training or teacher forcing
+        # if training, teacher forcing
         predictions =word_module.call(inputs, roots_emb,targets_padded_sentences)
     else:
-        #otherwise sampling
+        # otherwise inference
         if samp:
             predictions = word_module.sampling(roots_emb,inputs)
         else:
             predictions =  word_module.beam_search(roots_emb,inputs,sentences_len)
-    #unzip data (reshape as 2D matrix)
+    # unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort,samp)
     return vals
 
 #TODO handle root in each time stamp
-def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
+def zip_data(inp, sentences_len, targets,TR):
     """
     function to get data in format expected by RNN i.e. (n_senteces)*(sen_max_lenght)*(representation_size)
     :param inp:  input as 2D matrix
@@ -112,8 +110,6 @@ def zip_data(inp, sentences_len, targets,TR, root_only_in_fist_LSTM_time):
 
         # take nodes belonging to current sentence, pad them to max sentences length and concatenate them all together
         current_sen =inp[current_node:current_node+el]
-        if not root_only_in_fist_LSTM_time:
-            sys.exit("to implement")
 
         padding = tf.constant([[0, (max_len - el)], [0, 0]])
         current_sen = tf.pad(current_sen, padding, 'CONSTANT')

@@ -115,10 +115,9 @@ class NIC_Decoder(tf.keras.Model):
     def __init__(self,embedding_dim, units, vocab_size,drop_rate,beam):
         super(NIC_Decoder,self).__init__()
         self.embedding_layer = tf.keras.layers.Embedding(input_dim=vocab_size,output_dim=embedding_dim, name="embedding")
-        self.drop_word = tf.keras.layers.Dropout(drop_rate,noise_shape=(None,1,embedding_dim))
+        self.drop_word = tf.keras.layers.Dropout(drop_rate,noise_shape=(1,1,embedding_dim))
         self.rnn =tf.keras.layers.LSTM(units=units, return_state=True, return_sequences=True,recurrent_dropout=drop_rate, name="LSTM")
         self.final_layer = tf.keras.layers.Dense(vocab_size, activation="linear",name="final_word_pred_layer")
-        self.drop_final = tf.keras.layers.Dropout(drop_rate)
         self.units = units
         self.beam = 5#beam
         self.vocab_size = vocab_size
@@ -139,8 +138,6 @@ class NIC_Decoder(tf.keras.Model):
         # call LSTM
         states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
         rnn_output,state_h,state_c= self.rnn(rnn_input, initial_state = states, training=True)
-        rnn_output = self.drop_final(rnn_output,training=True)
-        #get predictions from last layer
         predictions = self.final_layer(rnn_output)
 
         return predictions
@@ -252,25 +249,22 @@ class NIC_Decoder(tf.keras.Model):
         # main function
         max_length = max(sentences_len)
         assert min(sentences_len)>=2
-        current_seqs, last_words,states = first_words_pred(features)
+        current_seqs, last_words,states = first_words_pred(featuresz)
         sen_len_offset = sentences_len-1
 
+        # main loop
         for j in range(1,max_length):
             beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words, states,sen_len_offset)
             current_seqs, states,last_words, sen_len_offset = \
                 beam_update(beam_ris, current_seqs,sen_len_offset, current_states_h,current_states_c,)
 
-        #final_pred = tf.convert_to_tensor(current_seqs['computed_seqs'])
-        #idxs = tf.convert_to_tensor(current_seqs['computed_idxs'])
+        # after the loop, take the sentences predicted, sort them and transform indexes to one_hot vecotrs
         idxs = np.argsort(current_seqs['computed_idxs'])
         preds = current_seqs['computed_seqs']
         final_pred = [tf.one_hot(preds[i],depth=self.vocab_size) for i in idxs]
         for i in range(len(sentences_len)):
             assert  final_pred[i].shape[0]==sentences_len[i]
-        #final_pred = tf.gather(final_pred,idxs)
         print(tf.reduce_mean(tf.math.exp(current_seqs['pred_probs'])))
-        #si può fare anche senza one-hot?
-        #final_pred = tf.one_hot(final_pred,depth=self.vocab_size)
         return final_pred
 
 
