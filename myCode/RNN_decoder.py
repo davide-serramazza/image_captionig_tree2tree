@@ -119,7 +119,7 @@ class NIC_Decoder(tf.keras.Model):
         self.rnn =tf.keras.layers.LSTM(units=units, return_state=True, return_sequences=True,recurrent_dropout=drop_rate, name="LSTM")
         self.final_layer = tf.keras.layers.Dense(vocab_size, activation="linear",name="final_word_pred_layer")
         self.units = units
-        self.beam = 5#beam
+        self.beam = beam
         self.vocab_size = vocab_size
 
     def call(self,pos_embs, images_emb, targets):

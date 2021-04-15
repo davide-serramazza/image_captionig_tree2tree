@@ -13,9 +13,6 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,lamb,clipping,batch_size, flat_val_captions, tensorboard_name,
                 tree_encoder, tree_decoder, final=False, keep_rate=1.0):
 
-    best_loss = 100
-    best_bleu=0
-
     #tensorboard
     summary_writer = tfs.create_file_writer(FLAGS.model_dir+tensorboard_name, flush_millis=1000)
     summary_writer.set_as_default()
@@ -74,9 +71,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
             summary.print_summary(i)
             # print stats
-            if i % FLAGS.check_every == 0 and i!=0:
-                #var_to_save = encoder.variables+encoder.weights + decoder.variables+decoder.weights + optimizer.variables()
-                #tfe.Saver(var_to_save).save(checkpoint_prefix,global_step=tf.train.get_or_create_global_step())
+            if i % FLAGS.check_every == 0:
                 input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data),tree_encoder)
 
                 if not tree_encoder:
@@ -87,92 +82,59 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 if tree_encoder:
                     batch_val_enc = batch_val_enc.get_root_embeddings()
 
-                if tree_decoder:
-                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,training=False,samp=True)
-                    loss_struct_val, loss_values_validation = batch_val_dec.reconstruction_loss()
-                    loss_validation = loss_struct_val + loss_values_validation["POS_tag"]+loss_values_validation["word"]
-                    tfs.scalar("loss/validation/loss_struc", loss_struct_val)
-                    tfs.scalar("loss/validation/loss_value", loss_validation)
-                    tfs.scalar("loss/validation/loss_value_POS", loss_values_validation["POS_tag"])
-                    tfs.scalar("loss/validation/loss_value_word", loss_values_validation["word"])
+                batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,training=False,samp=True)
+                loss_struct_val, loss_values_validation = batch_val_dec.reconstruction_loss()
+                loss_validation = loss_struct_val + loss_values_validation["POS_tag"]+loss_values_validation["word"]
+                tfs.scalar("loss/validation/loss_struc", loss_struct_val)
+                tfs.scalar("loss/validation/loss_value", loss_validation)
+                tfs.scalar("loss/validation/loss_value_POS", loss_values_validation["POS_tag"])
+                tfs.scalar("loss/validation/loss_value_word", loss_values_validation["word"])
 
-                    print("iteration ", i, " supervised:\nloss train word is ", loss_word, " loss train POS is ", loss_POS , "\n",
-                          " loss validation word is ", loss_values_validation["word"], " loss validation POS is ", loss_values_validation["POS_tag"])
+                print("iteration ", i, " supervised:\nloss train word is ", loss_word, " loss train POS is ", loss_POS , "\n",
+                      " loss validation word is ", loss_values_validation["word"], " loss validation POS is ", loss_values_validation["POS_tag"])
 
-                    #get unsupervised validation loss
-
-
-                    # sampling
-                    batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True)
-                    pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
-                    bleu_1 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1.0,))
-                    bleu_2 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.5,0.5))
-                    bleu_3 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1/3,1/3,1/3))
-                    bleu_4 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.25,0.25,0.25,0.25))
-                    print("sampling" , bleu_1, bleu_2, bleu_3,bleu_4)
-                    tfs.scalar("bleu/blue-1", bleu_1)
-                    tfs.scalar("bleu/blue-2", bleu_2)
-                    tfs.scalar("bleu/blue-3", bleu_3)
-                    tfs.scalar("bleu/blue-4", bleu_4)
+                #get unsupervised validation loss
+                # sampling
+                batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True)
+                pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
+                bleu_1 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1.0,))
+                bleu_2 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.5,0.5))
+                bleu_3 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1/3,1/3,1/3))
+                bleu_4 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.25,0.25,0.25,0.25))
+                print("sampling" , bleu_1, bleu_2, bleu_3,bleu_4)
+                tfs.scalar("bleu/blue-1", bleu_1)
+                tfs.scalar("bleu/blue-2", bleu_2)
+                tfs.scalar("bleu/blue-3", bleu_3)
+                tfs.scalar("bleu/blue-4", bleu_4)
 
 
 
-                    # beam
-                    batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)
-                    pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees)
-                    bleu_1_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1.0,))
-                    bleu_2_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.5,0.5))
-                    bleu_3_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1/3,1/3,1/3))
-                    bleu_4_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.25,0.25,0.25,0.25))
-                    tfs.scalar("bleu/blue-1_b", bleu_1_b)
-                    tfs.scalar("bleu/blue-2_b", bleu_2_b)
-                    tfs.scalar("bleu/blue-3_b", bleu_3_b)
-                    tfs.scalar("bleu/blue-4_b", bleu_4_b)
-                    print("beam    " , bleu_1_b, bleu_2_b, bleu_3_b,bleu_4_b, "\n")
+                # beam
+                batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)
+                pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees)
+                bleu_1_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1.0,))
+                bleu_2_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.5,0.5))
+                bleu_3_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1/3,1/3,1/3))
+                bleu_4_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.25,0.25,0.25,0.25))
+                tfs.scalar("bleu/blue-1_b", bleu_1_b)
+                tfs.scalar("bleu/blue-2_b", bleu_2_b)
+                tfs.scalar("bleu/blue-3_b", bleu_3_b)
+                tfs.scalar("bleu/blue-4_b", bleu_4_b)
+                print("beam    " , bleu_1_b, bleu_2_b, bleu_3_b,bleu_4_b, "\n")
 
 
-                    s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
-                        Tree.compare_trees(target_val, batch_unsuperv.decoded_trees)
-                    tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
-                    tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
-                    tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
-                    tfs.scalar("overlaps/unsupervised/matched_POS", matched_pos_uns)
-                    tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
-                    tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
+                s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
+                    Tree.compare_trees(target_val, batch_unsuperv.decoded_trees)
+                tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
+                tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
+                tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
+                tfs.scalar("overlaps/unsupervised/matched_POS", matched_pos_uns)
+                tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
+                tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
 
+                print("iteration ", i, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
+                    "that is a perc of", (matched_pos_uns/tot_pos_uns)*100, " " ,matched_word_uns, " out of ",total_word_uns,
+                      "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg,
+                      " bleu-1 ", bleu_1," bleu-2 ", bleu_2," bleu-3 ", bleu_3," bleu-4 ", bleu_4)
 
-                if tree_decoder:
-                    print("iteration ", i, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
-                          "that is a perc of", (matched_pos_uns/tot_pos_uns)*100, " " ,matched_word_uns, " out of ",total_word_uns,
-                          "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg,
-                          " bleu-1 ", bleu_1," bleu-2 ", bleu_2," bleu-3 ", bleu_3," bleu-4 ", bleu_4)
-                else:
-                    print("iteration ", i," bleu-1 ", bleu_1," bleu-2 ", bleu_2," bleu-3 ", bleu_3," bleu-4 ", bleu_4)
-                    loss_validation=0
-                    matched_word_uns=0
-                    matched_pos_uns=0
-                    s_avg=0
-
-                if best_bleu < bleu_1:
-                    #update best results
-                    best_bleu = bleu_1
-                    best_loss = loss_validation
-                    best_matched_word=matched_word_uns
-                    best_matched_pos = matched_pos_uns
-                    best_n_it = i
-                    best_struct = s_avg
-                    #predictions
-                elif best_loss > loss_validation:
-                    best_loss=loss_validation
-                #else:
-                #    break
                 del target_val
-
-# TODO spostare in RNN_Decoder ed importarla in validation
-def loss_function(real, pred):
-    mask = tf.math.logical_not(tf.math.equal(tf.argmax(real,axis=-1), 0))
-    loss_ = tf.nn.softmax_cross_entropy_with_logits_v2(labels=real, logits=pred)
-    #loss_ = K.categorical_crossentropy(real, pred, from_logits=True)
-    mask = tf.cast(mask, dtype=loss_.dtype)
-    loss_ *= mask
-    return tf.reduce_mean(loss_)

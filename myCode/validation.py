@@ -14,7 +14,7 @@ def main():
     parser.add_argument('train', type=str, help="Training set \
     (if provided a list it is assumed it contains the tree encoding, otherwise if dir it is assumed it contains image files ")
     parser.add_argument('val', type=str, help="Validation set. Same assumptions of train set")
-    parser.add_argument('--test',type=str, help="test set. if specified it's used for assessment and validation it's used along with train")
+    parser.add_argument('test',type=str, help="test set. if specified it's used for assessment and validation it's used along with train")
     parser.add_argument('targets', type=str, help="dir containing a xml file for each images in which the parse tree\
      of the caption is described.This targets are used only for training")
     parser.add_argument('all_captions', type=str, help="file containing each image captions.\
@@ -29,7 +29,7 @@ def main():
     parser.add_argument('lambd', type=float, help="coefficient of penalization on encoder representation")
     parser.add_argument('beta', type=float, help="coefficient for L2 reg.")
     parser.add_argument('hidden_coeff', type=float, help="coefficient for hidden dimension of encoder and decoder layer")
-    learning_rate = 0.00003
+    learning_rate = 0.0001
     clipping = 0.01
     batch_size = 32
     parser.add_argument('rnn_unit_size', type=int, help="size of rnn expressed as coefficient relative to embedding size")
@@ -39,7 +39,6 @@ def main():
     ####################
     args = parser.parse_args()
 
-    print(args.test, args.test==None)
     ##################
     # FLAGS
     ##################
