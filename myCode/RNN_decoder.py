@@ -133,7 +133,7 @@ class NIC_Decoder(tf.keras.Model):
         word_embs = tf.concat([images_emb,word_embs],axis=1)
 
         # concatenate also pos tag as inputs in addition to the previous ones
-        rnn_input = word_embs #tf.concat([word_embs,pos_embs],axis=-1)
+        rnn_input = tf.concat([word_embs,pos_embs],axis=-1) #rnn_input = word_embs
 
         # call LSTM
         states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
@@ -155,7 +155,7 @@ class NIC_Decoder(tf.keras.Model):
             else:
                 current_word_embs= self.embedding_layer(tf.argmax(predictions, axis=-1))
             current_pos_embs = tf.expand_dims (pos_embs[:, i, :], axis=1)
-            rnn_inputs = current_word_embs #tf.concat([current_word_embs, current_pos_embs], axis=-1)
+            rnn_inputs = tf.concat([current_word_embs, current_pos_embs], axis=-1) #rnn_inputs = current_word_embs
             rnn_output,states_h,state_c = self.rnn(rnn_inputs, initial_state = states,training=False)
             states=[states_h,state_c]
 
@@ -167,10 +167,10 @@ class NIC_Decoder(tf.keras.Model):
 
     def beam_search(self,features,pos_embs,sentences_len):
         # helper functions
-        def first_words_pred(features):
+        def first_words_pred(features,current_pos):
             # get sentences number and expand image features
             n_sentences = features.shape[0]
-            rnn_input = tf.expand_dims(features, axis=1)
+            rnn_input = tf.expand_dims(tf.concat([features,current_pos],axis=-1), axis=1)
 
             # perform first words prediction and keep for each of them the top-k
             states = [tf.zeros(shape=(n_sentences, self.units))] * 2 # initial states are zero vectors
@@ -224,13 +224,15 @@ class NIC_Decoder(tf.keras.Model):
 
             return current_seqs, new_states, last_words,sen_len_offset
 
-        def single_beam_step(current_seqs,last_words,states,sen_len_offsets):
+        def single_beam_step(current_seqs,last_words,current_pos,states,sen_len_offsets):
             # get relative embedding and call rnn
             n_sens = sen_len_offsets.shape[0]
 
             # from embedding to predictions
             prev_word_embedding = self.embedding_layer(last_words)
-            rnn_output, state_h, state_c = self.rnn(prev_word_embedding, initial_state=states, training=False)
+            current_pos = tf.expand_dims(tf.gather(current_pos,[i for i in range(n_sens) for j in range(self.beam)]),axis=1)
+            rnn_input = tf.concat([prev_word_embedding , current_pos],axis=-1)
+            rnn_output, state_h, state_c = self.rnn(rnn_input, initial_state=states, training=False)
             predictions = tf.nn.softmax(self.final_layer(rnn_output), axis=-1)
             # reshape preds as (n_sens, beam,vocab_dim)  and get logarithm
             predictions =tf.reshape(predictions,shape=(-1,self.beam,self.vocab_size))
@@ -249,12 +251,12 @@ class NIC_Decoder(tf.keras.Model):
         # main function
         max_length = max(sentences_len)
         assert min(sentences_len)>=2
-        current_seqs, last_words,states = first_words_pred(featuresz)
+        current_seqs, last_words,states = first_words_pred(features,pos_embs[:,0,:])
         sen_len_offset = sentences_len-1
 
         # main loop
         for j in range(1,max_length):
-            beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words, states,sen_len_offset)
+            beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words,pos_embs[:,j,:], states,sen_len_offset)
             current_seqs, states,last_words, sen_len_offset = \
                 beam_update(beam_ris, current_seqs,sen_len_offset, current_states_h,current_states_c,)
 

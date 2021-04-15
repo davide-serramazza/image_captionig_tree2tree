@@ -40,6 +40,8 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
     image_features_extract_model = istanciate_CNN(tree_encoder)
     train_data = read_images(args.train,image_features_extract_model,tree_cnn_type,batch_size)
     val_data = read_images(args.val,image_features_extract_model,tree_cnn_type,batch_size)
+    if args.test!=None:
+        a = 2
     print('loading sentence trees...')
     if tree_decoder:
         label_tree_with_sentenceTree(train_data,val_data, args.targets)

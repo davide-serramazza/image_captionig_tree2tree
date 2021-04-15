@@ -14,6 +14,7 @@ def main():
     parser.add_argument('train', type=str, help="Training set \
     (if provided a list it is assumed it contains the tree encoding, otherwise if dir it is assumed it contains image files ")
     parser.add_argument('val', type=str, help="Validation set. Same assumptions of train set")
+    parser.add_argument('--test',type=str, help="test set. if specified it's used for assessment and validation it's used along with train")
     parser.add_argument('targets', type=str, help="dir containing a xml file for each images in which the parse tree\
      of the caption is described.This targets are used only for training")
     parser.add_argument('all_captions', type=str, help="file containing each image captions.\
@@ -38,6 +39,7 @@ def main():
     ####################
     args = parser.parse_args()
 
+    print(args.test, args.test==None)
     ##################
     # FLAGS
     ##################
