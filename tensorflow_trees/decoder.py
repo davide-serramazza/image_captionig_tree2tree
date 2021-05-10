@@ -6,7 +6,7 @@ from tensorflow_trees.batch import BatchOfTreesForDecoding
 from tensorflow_trees.decoder_cells import GatedFixedArityNodeDecoder, ParallelDense
 from myCode.word_processing import *
 from myCode.tree_defintions import WordValue
-from myCode.RNN_decoder import RNN_Decoder, NIC_Decoder
+from myCode.RNN_decoder import NIC_Decoder
 
 class DecoderCellsBuilder:
     """ Define interfaces and simple implementations for a cells builder, factory used for the decoder modules.
@@ -68,7 +68,7 @@ class DecoderCellsBuilder:
         return m
 
     @staticmethod
-    def simple_distrib_cell_builder(hidden_coef, activation=tf.nn.relu):
+    def simple_distrib_cell_builder(hidden_coef, drop_rate ,activation=tf.nn.relu):
         """Unscaled output. Needed to compute `tf.nn.sparse_softmax_with_logits` """
         def f(output_size: (int, int), decoder: Decoder, name=None):
             total_output_size = output_size[0] * output_size[1]
@@ -77,7 +77,8 @@ class DecoderCellsBuilder:
             size2 = int((size1 + decoder.embedding_size) * hidden_coef)
 
             return tf.keras.Sequential([
-                tf.keras.layers.Dense(150, activation=activation), #orginale era 300!
+                tf.keras.layers.Dense(300, activation=activation), #prima era 150
+                tf.keras.layers.Dropout(rate=drop_rate),
                 # tf.keras.layers.Dense(200, activation=activation),
                 tf.keras.layers.Dense(output_size[0] * output_size[1]),
                 tf.keras.layers.Lambda(lambda x: tf.reshape(x, [-1, output_size[1]]), output_shape=(output_size[1],))
@@ -85,7 +86,7 @@ class DecoderCellsBuilder:
         return f
 
     @staticmethod
-    def simple_node_inflater_builder(hidden_coef: float, activation=tf.nn.relu, gate=True):
+    def simple_node_inflater_builder(hidden_coef: float,drop_rate, activation=tf.nn.relu, gate=True):
         def f(node_def: NodeDefinition, decoder, name=None):
             if type(node_def.arity) == NodeDefinition.FixedArity:
                 if gate:
@@ -110,18 +111,21 @@ class DecoderCellsBuilder:
                                      parallel_clones=decoder.cut_arity, gated=gate, name=name), \
                        tf.keras.Sequential([
                            tf.keras.layers.Dense(int(decoder.embedding_size * (1+hidden_coef*0.5)), activation=activation),
+                           tf.keras.layers.Dropout(rate=drop_rate),
                            tf.keras.layers.Dense(decoder.embedding_size, activation=activation),
+                           tf.keras.layers.Dropout(rate=drop_rate)
                        ], name=name+'_extra')
         return f
 
     @staticmethod
-    def simple_1ofk_value_inflater_builder(hidden_coef, activation=tf.nn.relu):
+    def simple_1ofk_value_inflater_builder(hidden_coef,drop_rate, activation=tf.nn.relu):
         """Unscaled output. Needed to compute `tf.nn.sparse_softmax_with_logits` """
         def f(node_def: NodeDefinition, decoder: "Decoder", name=None):
             size1 = int((node_def.value_type.representation_shape + decoder.embedding_size) * hidden_coef)
             size2 = int((size1 + decoder.embedding_size) * hidden_coef)
             return tf.keras.Sequential([
                 tf.keras.layers.Dense(2*size1, activation=activation),
+                tf.keras.layers.Dropout(rate=drop_rate),
                 # tf.keras.layers.Dense(size2, activation=activation),
                 tf.keras.layers.Dense(node_def.value_type.representation_shape)
             ], name=name)
@@ -157,7 +161,7 @@ class Decoder(tf.keras.Model):
                  tree_def: TreeDefinition = None, embedding_size: int = None,
                  max_depth: int = None, max_arity: int = None, cut_arity: int = None,
                  cellsbuilder: DecoderCellsBuilder = None, max_node_count: int = 1000, take_root_along=True,
-                 variable_arity_strategy="FLAT",hidden_word=100,attention=None,keep_rate=1.0):
+                 variable_arity_strategy="FLAT",word_module):
         """
         :param tree_def:
         :param embedding_size:
@@ -192,11 +196,7 @@ class Decoder(tf.keras.Model):
 
         self.take_root_along = take_root_along
 
-        self.root_only_in_fist_LSTM_time = True
-        self.attention = attention
-        #self.word_module = RNN_Decoder(WordValue.embedding_size, 11, WordValue.representation_shape)
-        self.word_module = NIC_Decoder(WordValue.embedding_size,WordValue.representation_shape)
-        self.keep_rate = keep_rate
+        self.word_module = word_module
 
         # if not attr, they don't get registered as variable by the keras model (dunno why)
         for t in tree_def.node_types:
@@ -218,13 +218,12 @@ class Decoder(tf.keras.Model):
                     setattr(self, 'dist_' + t.id, cellsbuilder.build_distrib_cell((1, len(self.all_types) + 1), self, name="distrib_" + t.id))  # one special output for - nochild
                     setattr(self, 'infl_' + t.id, cellsbuilder.build_node_inflater(t, self, name="inflater_" + t.id))
 
-            if t.value_type is not None:
+            if t.value_type is not None and t.id!='word':
                 setattr(self, 'value_' + t.id, cellsbuilder.build_value_inflater(t, self, name='value_' + t.id))
 
     def __call__(self, *,
                  encodings: tf.Tensor = None, targets: T.List[Tree] = None,     # this two lines are mutual exclusive
-                 batch: BatchOfTreesForDecoding = None,             #
-                 augment_fn=None,n_it=0):
+                 batch: BatchOfTreesForDecoding = None,augment_fn=None, training, samp ):
         """ Batched computation. All fireable operations are grouped according to node kinds and the one single aggregated
         operation is ran. Turned out to give a ~2x speedup.
         :param embeddings: [batch_size, embedding_size]
@@ -236,7 +235,6 @@ class Decoder(tf.keras.Model):
             if encodings is None:
                 raise ValueError("Or batch or xs must be set")
             else:
-                img_embs = encodings
                 batch = BatchOfTreesForDecoding(encodings, self.tree_def, targets)
         all_ops = {nt.id: [] for nt in self.all_types}
         TR = batch.target_trees is not None
@@ -291,7 +289,7 @@ class Decoder(tf.keras.Model):
             ops = all_ops.pop(op_id)
             all_ops[op_id] = []
             if len(ops) == 0:
-                #eventually compute words
+                # eventually compute words
                 op_id = "word"
                 node_type = self.all_types[self.all_types_idx[op_id]]
                 try:
@@ -326,10 +324,9 @@ class Decoder(tf.keras.Model):
 
                 if op_id=="POS_tag":
                     infl = getattr(self, 'value_'+node_type.id)
-                    vals = infl.compiled_call(inp)
+                    vals = infl.compiled_call(inp,training=training)
                 else:
-                    vals = words_predictions(self.word_module,batch_idxs,
-                        inp,targets,TR, img_embs, self.root_only_in_fist_LSTM_time,perm2usort,keep_rate = self.keep_rate,n_it=n_it)
+                    vals = words_predictions(self.word_module,batch_idxs,inp,targets,TR, encodings,perm2usort,samp)
                     #if current nodes are words, "unsort matrix contaning it i.e. go back to order expected
                     #by following code
 
@@ -354,7 +351,7 @@ class Decoder(tf.keras.Model):
                     dst = getattr(self, 'dist_' + node_type.id)
                     inf = getattr(self, 'infl_' + node_type.id)
 
-                    all_children_distribs = dst.compiled_call(inp)  # [batch * arity, types]
+                    all_children_distribs = dst.compiled_call(inp,training=training)  # [batch * arity, types]
                     if TR:
                         node_idx = [self.all_types_idx[c.node_type_id] for o in ops for c in o.meta["target"].children]
                     else:
@@ -366,7 +363,7 @@ class Decoder(tf.keras.Model):
                     oh_distrib = tf.reshape(oh_distrib_, tf.cast([len(node_idx) / node_type.arity.value, -1], tf.int32))
                     inp = tf.concat([inp, oh_distrib], axis=-1)
 
-                    all_embeddings = inf.compiled_call(inp) # [batch, arity * embedding_size]
+                    all_embeddings = inf.compiled_call(inp,training=training) # [batch, arity * embedding_size]
                     all_embeddings = tf.reshape(all_embeddings, [-1, self.embedding_size])
 
                     if TR:
@@ -418,7 +415,7 @@ class Decoder(tf.keras.Model):
                 dst = getattr(self, 'dist_' + node_type.id)
                 infl = getattr(self, 'infl_' + node_type.id)
 
-                distribs = dst.compiled_call(inp)
+                distribs = dst.compiled_call(inp,training=training)
                 no_child_idx = len(self.all_types)  # special idx to stop the children generations
 
                 if TR:
@@ -445,7 +442,7 @@ class Decoder(tf.keras.Model):
                 if inp.shape[0].value > 0:  # otherwise means no more children have to be generated
                     distribs_oh = tf.one_hot(node_idx, len(self.all_types) + 1)
                     inp = tf.concat([inp, tf.boolean_mask(distribs_oh, mask, axis=0)], axis=1)
-                    embs = infl.compiled_call(inp)    # compute the new embedding
+                    embs = infl.compiled_call(inp,training=training)    # compute the new embedding
 
                     # perform all the split at once is much more efficient then having multiple slicing
                     child, new_parent = tf.split(embs, 2, axis=1)
@@ -505,7 +502,7 @@ class Decoder(tf.keras.Model):
 
                 batch_size = inp.shape[0]
 
-                distribs = dst.compiled_call(inp)   # [batch * cut_arity, types+1] one special types means no child
+                distribs = dst.compiled_call(inp,training=training)   # [batch * cut_arity, types+1] one special types means no child
                 no_child_idx = len(self.all_types)
                 max_children_arity = max([len(o.meta['target'].children) for o in ops]) if TR else self.max_arity
                 EXTRA_CHILD = max_children_arity > self.cut_arity
@@ -553,7 +550,7 @@ class Decoder(tf.keras.Model):
 
                 first_distribs_gt = tf.reshape(distrib_gt[:, :self.cut_arity], [batch_size, -1])
                 first_inp = tf.concat([inp, first_distribs_gt], axis=1)
-                first_embs = infl.compiled_call(first_inp, min(max_children_arity, self.cut_arity))    #[arity, batch, embedding_size]
+                first_embs = infl.compiled_call(first_inp, min(max_children_arity, self.cut_arity),training=training)    #[arity, batch, embedding_size]
                 first_embs = tf.reshape(tf.transpose(first_embs, [1, 0, 2]), [-1, self.embedding_size]) # [batch * max_children_arity, embedding_size]
 
                 if TR:

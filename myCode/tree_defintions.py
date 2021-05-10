@@ -1,7 +1,6 @@
 from tensorflow_trees.definition import TreeDefinition, NodeDefinition
 import tensorflow as tf
 import myCode.shared_POS_words_lists as shared_list
-import numpy as np
 import sys
 
 ###########
@@ -74,8 +73,6 @@ class ImageTree:
         elif tree_cnn_type=="inception":
             self.tree_def = TreeDefinition(node_types=[
                 NodeDefinition("root",may_root=True,arity=NodeDefinition.VariableArity(min_value=0),value_type=ImageValueInceptionRoot),
-                NodeDefinition("othersInternal",may_root=False,arity=NodeDefinition.VariableArity(min_value=5),value_type=ImageValueInception),
-                NodeDefinition("doubleInternal",may_root=False,arity=NodeDefinition.FixedArity(4),value_type=ImageValueInception),
                 NodeDefinition("internal",may_root=False,arity=NodeDefinition.FixedArity(2),value_type=ImageValueInception),
                 NodeDefinition("leaf",may_root=False,arity=NodeDefinition.FixedArity(0),value_type=ImageValueInception)
             ])
@@ -105,18 +102,15 @@ class TagValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        s=shared_list
-        idx = t[0].numpy()
-        if type(idx)==np.uint8:
-            try:
-                ris = shared_list.idx_tag[idx]
-            except IndexError:
-                ris = "not_found"
-            return ris
-        elif type(idx)==np.ndarray:
-            return shared_list.idx_tag[np.argmax(idx)]
+        if t.shape==(1,):
+            # target
+            idx = (t[0]).numpy()
+        elif t.shape==(1,TagValue.representation_shape):
+            # generated
+            idx = tf.argmax(t[0]).numpy()
         else:
-            raise ValueError ("tag value of unknown type")
+            raise ValueError("Word of unknown shape")
+        return shared_list.idx_tags[idx]
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -127,16 +121,15 @@ class TagValue(NodeDefinition.Value):
         """
         ris=[]
         for el in v:
-            idx = shared_list.tag_idx[el]
-            ris.append( tf.one_hot(idx, TagValue.representation_shape ) )
-        return ris
-
+            idx = shared_list.tags_idx[el]
+            ris.append( tf.constant(idx ) )
+        return tf.convert_to_tensor(ris)
 
 class WordValue(NodeDefinition.Value):
     """
     class modelling word value i.e. emebedding vector
     """
-    representation_shape = 1    #word number in dataset
+    representation_shape = 0    #word number in dataset
     embedding_size=0    #embedding dimension
     class_value = True
 
@@ -150,17 +143,15 @@ class WordValue(NodeDefinition.Value):
 
     @staticmethod
     def representation_to_abstract_batch(t:tf.Tensor):
-        idx = t[0].numpy()
-        if type(idx)==np.uint16:
-            try:
-                ris = shared_list.idx_word[idx]
-            except IndexError:
-                ris = ""
-            return ris
-        elif type(idx)==np.ndarray:
-            return shared_list.idx_word[np.argmax(idx)]
+        if t.shape==(1,):
+            # target
+            idx = (t[0]).numpy()
+        elif t.shape==(1,WordValue.representation_shape):
+            # generated
+            idx = tf.argmax(t[0]).numpy()
         else:
-            raise ValueError ("word value of unknown type")
+            raise ValueError("Word of unknown shape")
+        return shared_list.tokenizer.index_word[idx]
 
     @staticmethod
     def abstract_to_representation_batch(v):
@@ -169,11 +160,12 @@ class WordValue(NodeDefinition.Value):
         :param v:
         :return:
         """
+        #if type(v)==list:
         ris=[]
         for el in v:
-            idx = shared_list.word_idx[el]
-            ris.append( tf.one_hot(idx,WordValue.representation_shape) )
-        return ris
+            idx = shared_list.tokenizer.word_index[el]
+            ris.append( tf.constant(idx) )
+        return tf.convert_to_tensor(ris)
 
 
 class SentenceTree:

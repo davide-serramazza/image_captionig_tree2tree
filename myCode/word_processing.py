@@ -1,9 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from myCode.tree_defintions import WordValue
-import random
 import sys
-import myCode.shared_POS_words_lists as shared_list
 
 def get_ordered_nodes(embeddings, ops,TR, trees):
     """
@@ -58,8 +55,7 @@ def get_ordered_nodes(embeddings, ops,TR, trees):
 #########################
 #functions used in words prediction
 #######################
-def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
-                      root_only_in_fist_LSTM_time,perm2unsort, keep_rate, n_it):
+def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,perm2unsort,samp):
     """
     function taking care of the wall word prediction (it calls several other functions)
     :param embedding:
@@ -70,25 +66,25 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,
     :param targets:
     :param TR:
     :param roots_emb:
-    :param root_only_in_fist_LSTM_time:
     :param perm2unsort:
     :param n_it: current iteration number
     :return:
     """
-    #take sentences length
+    # take sentences length
     sentences_len = get_sentences_length(batch_idxs,TR)
-    #prepare data (reshape as expected)
+    # prepare data (reshape as expected)
     inputs, targets_padded_sentences = zip_data(inp, sentences_len, targets,TR)
     if TR:
-        #if training or teacher forcing
-        #predictions = teacher_forcing(word_module,inputs, targets_padded_sentences,roots_emb,
-        #                              root_only_in_fist_LSTM_time,keep_rate)
-        predictions = word_module(inputs,roots_emb,targets_padded_sentences)
+        # if training, teacher forcing
+        predictions =word_module.call(inputs, roots_emb,targets_padded_sentences)
     else:
-        #otherwise sampling
-        predictions = word_module.sampling(inputs, roots_emb)
-    #unzip data (reshape as 2D matrix)
-    vals = unzip_data(predictions,sentences_len,perm2unsort)
+        # otherwise inference
+        if samp:
+            predictions = word_module.sampling(roots_emb,inputs)
+        else:
+            predictions =  word_module.beam_search(roots_emb,inputs,sentences_len)
+    # unzip data (reshape as 2D matrix)
+    vals = unzip_data(predictions,sentences_len,perm2unsort,samp)
     return vals
 
 #TODO handle root in each time stamp
@@ -104,8 +100,8 @@ def zip_data(inp, sentences_len, targets,TR):
     :return:
     """
     max_len = np.amax(sentences_len)
-    padded_input = None
-    targets_padded_sentences = None
+    padded_input = []
+    targets_padded_sentences = []
     current_node = 0
     current_tree=0
     # reshape as (n_senteces)*(sen_max_lenght)*(representation_size)
@@ -117,28 +113,28 @@ def zip_data(inp, sentences_len, targets,TR):
 
         padding = tf.constant([[0, (max_len - el)], [0, 0]])
         current_sen = tf.pad(current_sen, padding, 'CONSTANT')
-        current_sen = tf.expand_dims(current_sen,axis=0)
-        padded_input = update_matrix(current_sen, padded_input,ax=0)
+        padded_input.append(current_sen)
         if TR:
             # targets only if available i.e. if we are in TR
-            current_target = []
+            current_targets = []
             for item in targets[current_node:(current_node + el)]:
                 # take as target all words in current sentence except the last one (it will be never use as target)
-                current_target.append(item)
+                current_targets.append(item)
             # as before pad the sentence to max length, then concatenate with other ones
-            current_target = tf.concat([item for item in current_target], axis=0)
-            padding = tf.constant([[0, (max_len - el)]])
-            current_target = tf.pad(current_target, padding, 'CONSTANT')
-            current_target = tf.expand_dims(current_target,axis=0)
-            targets_padded_sentences = update_matrix(current_target,targets_padded_sentences,ax=0)
+            current_targets = tf.convert_to_tensor(current_targets)
+            padding = tf.constant( [ [0, (max_len - el)] ] )
+            current_targets = tf.pad(current_targets, padding, 'CONSTANT')
+            targets_padded_sentences.append(current_targets)
         #in any case update current node pointer
         current_node+=el
         current_tree+=1
+    padded_input = tf.convert_to_tensor(padded_input)
+    targets_padded_sentences = tf.convert_to_tensor(targets_padded_sentences)
     assert current_node == np.sum(sentences_len)
     return padded_input, targets_padded_sentences
 
 
-def unzip_data(predictions,sentences_len,perm2unsort):
+def unzip_data(predictions,sentences_len,perm2unsort,samp):
     """
     function to unzip rnn result i.e. go back in representation as 2D matrix and go back to previous order of nodes
     :param predictions:
@@ -146,111 +142,29 @@ def unzip_data(predictions,sentences_len,perm2unsort):
     :param perm2unsort:
     :return:
     """
-    vals = None
-    for i in range (len(sentences_len)):
-        current_sen_padded =predictions[i]
-        current_sen = current_sen_padded[0:sentences_len[i]]
-        vals = update_matrix(current_sen,vals,ax=0)
-    vals = tf.gather(vals, perm2unsort)
-    assert np.sum(sentences_len) == vals.shape[0]
+    def unzip_sampling(predictions,sentences_len,perm2unsort):
+        vals = []
+        for i in range (len(sentences_len)):
+            current_sen_padded =predictions[i]
+            current_sen = current_sen_padded[0:sentences_len[i]]
+            vals.append(current_sen)
+        vals = tf.concat([item for item in vals],axis=0)
+        vals = tf.gather(vals, perm2unsort)
+        assert np.sum(sentences_len) == vals.shape[0]
+        return vals
+
+    def unzip_beam(predictions,perm2unsort):
+        vals = tf.concat([t for t in predictions],axis=0)
+        assert  vals.shape[0]==perm2unsort.shape[0]
+        vals = tf.gather(vals, perm2unsort)
+        return vals
+
+    vals =  unzip_sampling(predictions,sentences_len,perm2unsort) if samp else unzip_beam(predictions,perm2unsort)
     return vals
-
-def teacher_forcing(word_module, inputs, targets_padded_sentences,roots,roots_conc_mode,keep_rate):
-    """
-    function to use at training time i.e. techaer forcing
-    :param embedding:
-    :param rnn:
-    :param final_layer:
-    :param inputs:
-    :param targets_padded_sentences:
-    :param roots:
-    :return:
-    """
-    #predictions = teacher_forcing_NIC(word_module, inputs, rnn, roots, roots_conc_mode,
-    #                                  targets_padded_sentences)
-
-    hidden = word_module.reset_state(batch_size=inputs.shape[0])
-    dec_input = tf.expand_dims([shared_list.word_idx['<start>']] * inputs.shape[0], 1)
-    predictions = None
-    for i in range(inputs.shape[1]):
-        current_pred,hidden = word_module.call(dec_input,roots,hidden,parents = tf.expand_dims (inputs[:,i,:],axis=1),keep_rate=keep_rate)
-        dec_input = tf.expand_dims( tf.argmax(targets_padded_sentences[:,i,:],axis=-1) , axis=1)
-        predictions = update_matrix(tf.expand_dims(current_pred,axis=1),predictions,ax=1)
-    return predictions
-
-
-
-def sampling(word_module, inputs, roots,roots_conc_mode):
-    """
-    function performing sampling i.e. compute i-th word and feed it as (i+1)-th rnn hidden state to rnn
-    :param embedding:
-    :param rnn:
-    :param final_layer:
-    :param inputs:
-    :param roots:
-    :return:
-    """
-    sentences = word_module.sampling(roots,shared_list.word_idx,shared_list.idx_word,inputs.shape[1],parents=inputs)
-    #sentences = sampling_NIC(embedding, final_layer, inputs, rnn, roots, roots_conc_mode)
-    return sentences
-
-
-
-######################
-#NIC code
-######################
-def teacher_forcing_NIC(word_module, inputs, roots, targets_padded_sentences):
-    embeddings = embedding_layer(tf.argmax(targets_padded_sentences, axis=2))
-    assert (roots.shape[-1] == embeddings.shape[-1]), "embedding dimensions must be the same"
-    roots = tf.expand_dims(roots, axis=1)
-    embeddings = tf.concat([roots, embeddings], axis=1)
-    padding = tf.constant([[0, 0], [1, 0], [0, 0]])
-    inputs = tf.pad(inputs, padding)
-    rnn_input = tf.concat([inputs, embeddings], axis=2)
-    rnn_out, state_h, state_c = rnn(rnn_input)
-    predictions = final_layer(rnn_out)
-    return predictions
-
-def sampling_NIC(embedding, final_layer, inputs, rnn, roots, roots_conc_mode):
-    sentences = None
-    # concatenate in the proper way, parent embedding and root embedding
-    if roots_conc_mode != None:
-        last_analized_words = tf.expand_dims(roots, axis=1)
-    else:
-        sys.exit("to implement")
-    max_sentences_len = inputs.shape[1]
-    for i in range(0, max_sentences_len):
-        # fed the i-th input to the rnn, save its status and upadate embeggins to use at iteration (i+1)-th
-        current_input = inputs[:, i, :]
-        current_input = tf.expand_dims(current_input, axis=1)
-        current_input = tf.concat([current_input, last_analized_words], axis=2)
-        if i == 0:
-            rnn_out, state_h, state_c = rnn(current_input)
-            state = [state_h, state_c]
-        else:
-            rnn_out, state_h, state_c = rnn(current_input, initial_state=state)
-            state = [state_h, state_c]
-        predictions = final_layer(rnn_out)
-        sentences = update_matrix(predictions, sentences, ax=1)
-        last_analized_words = embedding(tf.argmax(predictions, axis=2))
-    return sentences
 
 #######################
 #helper functions
 ######################
-
-def update_matrix(current, total, ax):
-    """
-    function that concatenate current matrix in total matrix, in axis ax
-    :param current: tensor to add
-    :param total: final tensor to return
-    :return:
-    """
-    if total == None:
-        total = current
-    else:
-        total = tf.concat([total, current], axis=ax)
-    return total
 
 def inv(perm):
     """
@@ -269,9 +183,9 @@ def get_sentences_length(batch_idxs,TR):
     :param batch_idxs:
     :return:
     """
+    sentences_len = []
     if TR:
         current_tree = 0
-        sentences_len = []
         current_len = 0
         for el in batch_idxs:
             if el == current_tree:
@@ -282,12 +196,11 @@ def get_sentences_length(batch_idxs,TR):
                 current_len = 1
         sentences_len.append(current_len)
     else:
-        sentences_len = []
         n_sentences = np.max(batch_idxs)+1
         for i in range(n_sentences):
             sentences_len.append(batch_idxs.count(i))
     assert np.sum(sentences_len) == len(batch_idxs)
-    return sentences_len
+    return np.asarray(sentences_len)
 
 def get_ordered_leafs(tree, l : list):
     """

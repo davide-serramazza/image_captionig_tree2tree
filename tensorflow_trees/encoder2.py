@@ -63,20 +63,17 @@ class EncoderCellsBuilder:
         return f
 
     @staticmethod
-    def simple_dense_embedder_builder(drop_rate,activation=tf.nn.leaky_relu):
+    def simple_dense_embedder_builder(activation=tf.nn.leaky_relu):
         def f(leaf_def: NodeDefinition, embedding_size, name=None):
 
-            return tf.keras.Sequential([
-                tf.keras.layers.Dense(embedding_size,
+            return tf.keras.layers.Dense(embedding_size,
                                          activation=activation,
                                          input_shape=(leaf_def.value_type.representation_shape,),
-                                         name=name),
-                tf.keras.layers.Dropout(rate=drop_rate)
-                ])
+                                         name=name)
         return f
 
     @staticmethod
-    def simple_cell_builder(hidden_coef, drop_rate,activation=tf.nn.leaky_relu, gate=True):
+    def simple_cell_builder(hidden_coef,drop_rate, activation=tf.nn.leaky_relu, gate=True):
         def f(node_def: NodeDefinition, encoder: 'Encoder', name=None):
             if type(node_def.arity) == node_def.VariableArity:
                 if not encoder.use_flat_strategy:
@@ -92,22 +89,22 @@ class EncoderCellsBuilder:
                                  (node_def.value_type.representation_shape if node_def.value_type is not None else 0)
 
                     output_model_builder = lambda :tf.keras.Sequential([
-                        NullableInputDenseLayer(input_size=input_size,
-                    hidden_activation=activation, hidden_size=encoder.embedding_size * int(encoder.cut_arity**hidden_coef)),
+                        NullableInputDenseLayer(input_size=input_size, hidden_activation=activation,
+                            hidden_size=encoder.embedding_size * int(encoder.cut_arity**hidden_coef)),
                         tf.keras.layers.Dropout(rate=drop_rate),
                         tf.keras.layers.Dense(encoder.embedding_size, activation=activation),
-                        tf.keras.layers.Dropout(rate=drop_rate)
-                            ], name=name)
+                        tf.keras.layers.Dropout(rate=drop_rate),
+                    ], name=name)
 
-                    return GatedNullableInput(output_model_builder=output_model_builder,maximum_input_size=input_size,
-                            embedding_size=encoder.embedding_size,name=name) if gate else output_model_builder(), \
+                    return GatedNullableInput(output_model_builder=output_model_builder,
+                                              maximum_input_size=input_size,
+                                              embedding_size=encoder.embedding_size,
+                                              name=name) if gate else output_model_builder(), \
                            tf.keras.Sequential([
                                # tf.keras.layers.Reshape([encoder.max_arity - encoder.cut_arity, encoder.embedding_size]),
                                tf.keras.layers.Dense(int(encoder.embedding_size * hidden_coef), activation=activation, input_shape=(encoder.embedding_size,),
                                                      name=name + '/extra_attention/1'),
-                               tf.keras.layers.Dropout(rate=drop_rate),
-                               tf.keras.layers.Dense(1, name=name + '/extra_attention/2'),
-                               tf.keras.layers.Dropout(rate=drop_rate)
+                               tf.keras.layers.Dense(1, name=name + '/extra_attention/2')
                            ])
                     # input_shape = (encoder.embedding_size * encoder.max_arity, )
             elif type(node_def.arity) == node_def.FixedArity:
@@ -163,9 +160,9 @@ class Encoder(tf.keras.Model):
         for l in tree_def.leaves_types:
             setattr(self, 'E_'+l.id, cellsbuilder.build_embedder(l, embedding_size, name=name+"E_" + l.id))
 
-    def _c_fixed_op(self, inp, ops, network,training):
+    def _c_fixed_op(self, inp, ops, network):
 
-        res = network.optimized_call(inp,training=training)
+        res = network.optimized_call(inp,training=True)
 
         ops[0].meta['emb_batch'].scatter_update('embs', [op.meta['node_numb'] for op in ops], res)
         for op in ops:
@@ -184,7 +181,7 @@ class Encoder(tf.keras.Model):
         else:
             return tf.tuple([inp, tf.zeros([inp.shape[0], 0])])
 
-    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]],training) -> BatchOfTreesForEncoding:
+    def __call__(self, batch: T.Union[BatchOfTreesForEncoding, T.List[Tree]],keep_prob_input=1.0,keep_prob=1.0) -> BatchOfTreesForEncoding:
 
         if not type(batch) == BatchOfTreesForEncoding:
             batch = BatchOfTreesForEncoding(batch, self.embedding_size)
@@ -228,8 +225,10 @@ class Encoder(tf.keras.Model):
 
             if op_t == 'E':
 
+                #TODO capire che voglio fare con root
                 inp = node_t.value_type.abstract_to_representation_batch([x.value.abstract_value for x in ops])
-                res = network.optimized_call(inp,training=training)
+                res = network.optimized_call(inp)
+                res = tf.nn.dropout(res,keep_prob=keep_prob_input)
 
                 #  superfluous when node is fused
                 if node_id not in self.tree_def.fusable_nodes_id_child_parent.keys():
@@ -246,7 +245,7 @@ class Encoder(tf.keras.Model):
 
                     inp, values = self.augment_with_value(res, self.node_map[ops[0].meta['parent'].node_type_id], rec_ops)
 
-                    self._c_fixed_op([inp, values], rec_ops, network,training=training)
+                    self._c_fixed_op([inp, values], rec_ops, network)
 
             elif op_t == 'C':
                 if type(node_t.arity) == NodeDefinition.FixedArity:
@@ -254,7 +253,7 @@ class Encoder(tf.keras.Model):
                     inp = tf.reshape(inp, [len(ops), -1])
                     inp, values = self.augment_with_value(inp, node_t, ops)
 
-                    self._c_fixed_op([inp, values], ops, network,training=training)
+                    self._c_fixed_op([inp, values], ops, network)
 
                 elif type(node_t.arity) == NodeDefinition.VariableArity and not self.use_flat_strategy:
                     # TODO rnn (e.g. lstm) ?
@@ -266,7 +265,7 @@ class Encoder(tf.keras.Model):
                     inp = tf.reshape(inp, [len(ops), -1])
                     inp, values = self.augment_with_value(inp, node_t, ops) # TODO test
 
-                    res = network.optimized_call([inp, values],training=training)
+                    res = network.optimized_call([inp, values])
 
                     k = ('C', node_id)
                     if k not in all_ops.keys():
@@ -322,7 +321,7 @@ class Encoder(tf.keras.Model):
                     inp = tf.reshape(inp, [len(ops), first_arity * self.embedding_size])
                     inp = tf.concat([inp, extra_children], axis=1)
                     inp, values = self.augment_with_value(inp, node_t, ops)
-                    res = network.optimized_call([inp, values],training=training)
+                    res = network.optimized_call([inp, values])
 
                     batch.scatter_update('embs',
                                          [op.meta['node_numb'] for op in ops],

@@ -3,7 +3,6 @@ import typing as T
 
 from tensorflow_trees.definition import NodeDefinition
 
-drop_rate = -1
 
 class GatedFixedArityNodeEmbedder(tf.keras.Model):
 
@@ -33,12 +32,12 @@ class GatedFixedArityNodeEmbedder(tf.keras.Model):
         self.output_f = tf.keras.Sequential([
             tf.keras.layers.Dense(size,
                                   activation=self.activation, name='/1'),
-            tf.keras.layers.Dropout(rate=drop_rate),
+            tf.keras.layers.Dropout(rate=0.5),
             tf.keras.layers.Dense(size,
                                   activation=self.activation, name='/2a'),
-            tf.keras.layers.Dropout(rate=drop_rate),
+            tf.keras.layers.Dropout(rate=0.5),
             tf.keras.layers.Dense(self.embedding_size, activation=self.activation, name='/2'),
-            tf.keras.layers.Dropout(rate=drop_rate)
+            tf.keras.layers.Dropout(rate=0.5)
         ])
 
         super(GatedFixedArityNodeEmbedder, self).build(input_shape)
@@ -52,13 +51,15 @@ class GatedFixedArityNodeEmbedder(tf.keras.Model):
             ]
         :return: [clones, batch, output_size]
         """
-        try:
-            training=kwargs["training"]
-        except:
-            training=True
         children, values = x
+
         concat = tf.concat([children, values], axis=-1)
-        output = self.output_f(concat,training=training)  # [batch, emb]
+        if kwargs=={}:
+            output = self.output_f(concat)
+        else:
+            output = self.output_f(concat,training = kwargs["training"])
+        # [batch, emb]
+
         # output gatings only on children embeddings (value embedding size might be different)
         # out = g * out + (g1 * c1 + g2 * c2 ...)
         childrens = tf.reshape(children, [children.shape[0], self.arity, -1])  # [batch, arity, children_emb]
@@ -146,6 +147,7 @@ class GatedNullableInput(tf.keras.Model):
                                                 hidden_size=self.maximum_input_size // self.embedding_size + 1)
 
         self.output_model = self.output_model_builder()
+        self.dropout = tf.keras.layers.Dropout(rate=drop_rate)
 
         super(GatedNullableInput, self).build(input_shape)
 
@@ -158,14 +160,11 @@ class GatedNullableInput(tf.keras.Model):
             ]
         :return: [clones, batch, output_size]
         """
-        try:
-            training=kwargs["training"]
-        except:
-            training=True
         children, values = x
         concat = tf.concat([children, values], axis=-1)
 
-        output = self.output_model(concat,training=training)
+        output = self.output_model(concat)
+
         number_of_input = children.shape[1].value // self.embedding_size
         gating_inp = tf.concat([output, concat], axis=-1)
         gatings = tf.nn.softmax(self.gating_f(gating_inp)[:, :number_of_input+1], axis=1)

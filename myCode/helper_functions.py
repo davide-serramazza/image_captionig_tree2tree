@@ -1,63 +1,16 @@
 from myCode.read_images_file import read_images
-from myCode.read_sentence import label_tree_with_sentenceTree,extraxt_topK_words
+from myCode.read_sentence import label_tree_with_sentenceTree
 import tensorflow as tf
-from random import randrange, uniform
-from random import shuffle
-import numpy as np
 import json
-import random
+from random import  choice
+from tensorflow_trees.definition import Tree
+from myCode.read_sentence import label_tree_with_real_data
 import myCode.shared_POS_words_lists as shared_list
+import xml.etree.ElementTree as ET
+import tensorflow.contrib.summary as tfs
+
 
 ######################
-#functions to extract all the image trees and all the sentence trees
-
-def get_image_batch(train_data,val_data,tree_encoder):
-    def f(data,tree_encoder):
-        to_return = []
-        for el in data:
-            if tree_encoder:
-                to_return.append(el["img_tree"])
-            else:
-                to_return=el["img"] if to_return==[] else tf.concat([to_return,el["img"]],axis=0)
-        return to_return
-
-    return f(train_data,tree_encoder), f(val_data,tree_encoder)
-
-def read_sentences_from_file(arg2,train_data,val_data):
-    def foo(arg2,data):
-        f = open(arg2)
-        f = f.read().splitlines()
-        captions = []
-        for el in data:
-            for cap in f:
-                tmp = cap.split(" : ")
-                if tmp[0]==el["name"]:
-                    captions.append('<start> '+tmp[1][:-1]+' <end>')
-        return captions
-
-    train_captions = foo(arg2,train_data)
-    val_captions = foo(arg2,val_data)
-    tokenizer,top_k = extraxt_topK_words(train_captions,filters='!"#$%&()*+.,-/:;=?@[\]^_`{|}~ ')
-    tokenizer.word_index['<pad>'] = 0
-    tokenizer.index_word[0] = '<pad>'
-    targets_train = tokenizer.texts_to_sequences(train_captions)
-    target_val = tokenizer.texts_to_sequences(val_captions)
-    cap_vector = tf.keras.preprocessing.sequence.pad_sequences(targets_train+target_val, padding='post')
-    target_train = tf.one_hot(cap_vector[:len(targets_train)],depth=top_k)
-    target_val = tf.one_hot(cap_vector[len(targets_train):],depth=top_k)
-    shared_list.word_idx = tokenizer.word_index
-    return target_train,target_val
-
-def get_sentence_batch(train_data,val_data,tree_decoder,arg2):
-    def f(data):
-        to_return=[]
-        for el in data:
-            to_return.append(random.choice(el['sentence_trees']))
-        return to_return
-    if tree_decoder:
-        return f(train_data), f(val_data)
-    else:
-        return read_sentences_from_file(arg2,train_data,val_data)
 
 def istanciate_CNN(tree_encoder):
     if not tree_encoder:
@@ -70,7 +23,7 @@ def istanciate_CNN(tree_encoder):
         image_features_extract_model = None
     return image_features_extract_model
 
-def load_all_captions(json_file,val_data):
+def load_flat_captions(json_file,val_data):
     with open(json_file) as json_file:
         data = json.load(json_file)
     val_all_captions = []
@@ -82,42 +35,23 @@ def load_all_captions(json_file,val_data):
             val_all_captions[-1].append( sentence.split(" ") )
     return val_all_captions
 
-def load_data(args,tree_encoder,tree_decoder,tree_cnn_type):
+def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
     print('loading image trees....')
     image_features_extract_model = istanciate_CNN(tree_encoder)
-    train_data = read_images(args.train,image_features_extract_model,tree_cnn_type)
-    val_data = read_images(args.val,image_features_extract_model,tree_cnn_type)
+    train_data = read_images(args.train,image_features_extract_model,tree_cnn_type,batch_size)
+    val_data = read_images(args.val,image_features_extract_model,tree_cnn_type,batch_size)
+    if args.test!='None':
+        test_data = read_images(args.test,image_features_extract_model,tree_cnn_type,batch_size)
+        train_data = train_data+val_data
+        val_data = test_data
     print('loading sentence trees...')
     if tree_decoder:
-        label_tree_with_sentenceTree(train_data, val_data, args.targets)
-    val_all_captions = load_all_captions(args.all_captions,val_data)
-    return train_data,val_data,val_all_captions
+        label_tree_with_sentenceTree(train_data,val_data, args.targets)
+    flat_val_caption = load_flat_captions(args.all_captions,val_data)
+    return train_data,val_data,flat_val_caption
 
-#def load_all_data(args,):
-    #print('loading image trees....')
-    #train_data = read_images(args[0])
-    #val_data = read_images(args[1])
-    #test_data = read_images(args[3])
-    #print('loading sentence trees...')
-    #label_tree_with_sentenceTree(train_data+val_data, test_data, args[2])
-#return train_data+val_data,test_data
-
-#def laod_test_data(args,dictionary, embeddings):
-    #print('loading image trees....')
-    #test_data = read_images(args[0])
-    #print('loading sentence trees...')
-    #label_tree_with_sentenceTree(test_data,args[3],embeddings,dictionary)
-    #return test_data
 
 #######################
-
-def help():
-    """
-    function exlaning argumen to be passed
-    :return:
-    """
-    print("1 -> train set file\n2 -> validation file\n3 -> parsed sentence dir")
-
 
 def define_flags():
     """
@@ -131,12 +65,12 @@ def define_flags():
 
     tf.flags.DEFINE_integer(
         "max_iter",
-        default=61,
+        default=100,
         help="Maximum number of iteration to train")
 
     tf.flags.DEFINE_integer(
         "check_every",
-        default=10,
+        default=5,
         help="How often (iterations) to check performances")
 
     tf.flags.DEFINE_integer(
@@ -150,86 +84,21 @@ def define_flags():
         help="Directory to put the model summaries, parameters and checkpoint.")
 
 
-def select_one_random(list):
-    """
-    function to select one random item within the given list (used in parameter selection for random search)
-    :param list:
-    :return:
-    """
-    return list [randrange(len(list))]
-
-def select_one_in_range(list, integer):
-    """
-    function to select a random value in the given range
-    :param list:
-    :param integer:
-    :return:
-    """
-
-    rand = uniform(list[0], list[1])
-
-    if integer:
-        return round(rand)
-    else:
-        return rand
-
-def shuffle_dev_set (train, validation):
-    """
-    function to shuffle train set and validation set
-    :param train:
-    :param validation:
-    :return: new train and validation with shuffled item and keeping the same proportion of the orginal
-    ones
-    """
-    dev_set = train + validation
-    tot_len = len(dev_set)
-    prop = float( len(train)  ) / float( len(train) + len(validation) )
-    train_end = int (float(tot_len)*prop)
-    shuffle(dev_set)
-    return dev_set[:train_end] , dev_set[train_end:]
-
-def shuffle_data(input,target,len_input):
-    assert input.shape[0] == len(target)
-    perm = np.random.permutation([i for i in range(0,len_input)])
-    input_shuffled =  tf.gather(input,[i for i in perm])
-    target_shuffled = [target[i] for i in perm]
-    input = None
-    target = None
-    return input_shuffled, target_shuffled
-
-def max_arity (list):
-    #TODO probabilmente da cancellare
-    """
-    funtion to get the msx_arity in data set
-    :param list: list of tree(dataset)
-    :return:
-    """
-    max_arity = 0
-    for el in list:
-        actual_arity = get_tree_arity(el)
-        if actual_arity > max_arity:
-            max_arity = actual_arity
-    return max_arity
-
-
-def get_tree_arity(t ):
+def get_image_arity(t ):
     max_arity = len(t.children)
     for child in t.children:
-        actual_arity = get_tree_arity(child)
+        actual_arity = get_image_arity(child)
         if actual_arity > max_arity:
             max_arity = actual_arity
     return max_arity
 
-
-def get_max_arity(input_train, input_val, target_train, target_val):
-    # compute max_arity
-    train_image_max_arity = max_arity(input_train)
-    val_image_max_arity = max_arity(input_val)
-    image_max_arity = max(train_image_max_arity, val_image_max_arity)
-    train_sen_max_arity = max_arity(target_train)
-    val_sen_max_arity = max_arity(target_val)
-    sen_max_arity = max(train_sen_max_arity, val_sen_max_arity)
-    return image_max_arity, sen_max_arity
+def get_sen_arity(tree : ET.Element):
+    max_arity = len(tree.getchildren())
+    for el in tree.getchildren():
+        current_arity = get_sen_arity(el)
+        if current_arity > max_arity:
+            max_arity = current_arity
+    return max_arity
 
 def take_word_vectors(t ,l:list):
     if t.node_type_id=="word":
@@ -247,33 +116,137 @@ def extract_words_from_tree(trees):
     return to_return
 
 
-def compute_max_arity(train_data, val_data,tree_encoder):
-    img_max_arity=0
+def compute_max_arity(train_data,val_data,tree_encoder):
+    image_max_arity=0
     sen_max_arity=0
     for el in train_data+val_data:
         if tree_encoder:
-            current_img_arity = get_tree_arity(el['img_tree'])
-            if current_img_arity>img_max_arity:
-                img_max_arity=current_img_arity
-        for caption in el['sentence_trees']:
-            current_sen_arity = get_tree_arity(caption)
+            current_img_arity=get_image_arity(el['img_tree'])
+            if current_img_arity>image_max_arity:
+                image_max_arity=current_img_arity
+
+        for caption in el['sentences']:
+            current_sen_arity= get_sen_arity(caption)
             if current_sen_arity>sen_max_arity:
                 sen_max_arity=current_sen_arity
-    return img_max_arity,sen_max_arity
-"""
-    if input_tree != None:
-        train_image_max_arity = max_arity(input_train)
-        val_image_max_arity = 0
-        image_max_arity = max(train_image_max_arity, val_image_max_arity)
-    else:
-        image_max_arity = 0
-        input_train = tf.Variable(input_train)
-        input_train = tf.squeeze(input_train)
-    if target_tree != None:
-        train_sen_max_arity = max_arity(target_train)
-        val_sen_max_arity = 10
-        sen_max_arity = max(train_sen_max_arity, val_sen_max_arity)
-    else:
-        sen_max_arity = 0
-    return image_max_arity, input_train, sen_max_arity
-"""
+    return image_max_arity, sen_max_arity
+
+
+def get_input_target_minibatch(data,j,batch_size,tree_encoder):
+    images=[]
+    captions=[]
+    for i in range( j,min( j+batch_size,len(data) ) ):
+        el = data[i]
+        if tree_encoder:
+            images.append(el['img_tree'])
+        else:
+            images.append(el['img'])
+        # choose a random caption
+        caption = choice(el['sentences'])
+
+        #build the tree now
+        sentence_tree = Tree(node_type_id="dummy root", children=[],value="dummy")
+        label_tree_with_real_data(caption, sentence_tree,shared_list.tokenizer)
+        captions.append( sentence_tree.children[0] )
+
+    if not tree_encoder:
+        images  = tf.convert_to_tensor(images)
+    return images,captions
+
+class Summary ():
+    def __init__(self,train):
+        self.loss_struct = 0
+        self.loss_value = 0
+        self.loss_POS = 0
+        self.loss_word = 0
+        self.h_norm_it= 0
+        self.w_norm_it= 0
+        #grads
+        self.gnorm_tot_it= 0
+        self.gnorm_enc_it=0
+        self.gnorm_dec_it=0
+        self.gnorm_RNN_it=0
+        self.gnorm_wordModule_it=0
+        #grads clipped
+        self.gnorm_tot_it_clipped= 0
+        self.gnorm_enc_it_clipped=0
+        self.gnorm_dec_it_clipped=0
+        self.gnorm_RNN_it_clipped=0
+        self.gnorm_wordModule_it_clipped=0
+
+        self.n_miniBatch = 0
+        self.train = train
+
+
+    def add_miniBatch_summary(self,loss_struct_miniBatch,loss_value_miniBatch,loss_value_miniBatch_pos,loss_value_miniBatch_word,
+                              h_norm,w_norm,gnorm,grad,grad_clipped,variables):
+        self.loss_struct += loss_struct_miniBatch
+        self.loss_value += loss_value_miniBatch
+        self.loss_POS += loss_value_miniBatch_pos
+        self.loss_word +=  loss_value_miniBatch_word
+        self.h_norm_it += h_norm
+        self.w_norm_it += w_norm
+
+        enc_v=[]
+        dec_v=[]
+        rnn_v=[]
+        word_module_v=[]
+
+        enc_v_clipped=[]
+        dec_v_clipped=[]
+        rnn_v_clipped=[]
+        word_module_v_clipped=[]
+
+        for (g,gc,v) in zip (grad,grad_clipped,variables):
+            if "cnn__encoder" in v.name:
+                enc_v.append(g)
+                enc_v_clipped.append(gc)
+            elif 'final_word_pred' in v.name or 'word_embedding' in v.name:
+                word_module_v.append(g)
+                word_module_v_clipped.append(gc)
+            elif 'LSTM' in v.name:
+                word_module_v.append(g)
+                rnn_v.append(g)
+                word_module_v_clipped.append(gc)
+                rnn_v_clipped.append(gc)
+            else:
+                dec_v.append(g)
+                dec_v_clipped.append(gc)
+
+        self.gnorm_tot_it += gnorm
+        self.gnorm_enc_it += tf.global_norm(enc_v)
+        self.gnorm_dec_it += tf.global_norm(dec_v)
+        self.gnorm_RNN_it += tf.global_norm(rnn_v)
+        self.gnorm_wordModule_it += tf.global_norm(word_module_v)
+
+        self.gnorm_tot_it_clipped += tf.global_norm(grad_clipped)
+        self.gnorm_enc_it_clipped += tf.global_norm(enc_v_clipped)
+        self.gnorm_dec_it_clipped += tf.global_norm(dec_v_clipped)
+        self.gnorm_RNN_it_clipped += tf.global_norm(rnn_v_clipped)
+        self.gnorm_wordModule_it_clipped += tf.global_norm(word_module_v_clipped)
+
+        self.n_miniBatch+=1
+
+    def print_summary(self,it):
+        name = "" if self.train else "val"
+        tfs.scalar("loss/loss_struc"+name, self.loss_struct /self.n_miniBatch)
+        tfs.scalar("loss/loss_value"+name, self.loss_value /self.n_miniBatch)
+        tfs.scalar("loss/loss_value_POS"+name, self.loss_POS /self.n_miniBatch)
+        tfs.scalar("loss/loss_value_word"+name, self.loss_word /self.n_miniBatch)
+        tfs.scalar("norms/hidden representation norm"+name, self.h_norm_it/self.n_miniBatch)
+        tfs.scalar("norms/square of weights norm"+name, self.w_norm_it/self.n_miniBatch)
+
+        tfs.scalar("norms/grad"+name, self.gnorm_tot_it /self.n_miniBatch)
+        tfs.scalar("norms/dec_grad"+name, self.gnorm_dec_it/self.n_miniBatch)
+        tfs.scalar("norms/RNN_grad"+name, self.gnorm_RNN_it/self.n_miniBatch)
+        tfs.scalar("norms/word_module_grad"+name, self.gnorm_wordModule_it/self.n_miniBatch)
+        tfs.scalar("norms/enc_grad"+name, self.gnorm_enc_it/self.n_miniBatch)
+
+        tfs.scalar("norms/grad_clipped"+name, self.gnorm_tot_it_clipped /self.n_miniBatch)
+        tfs.scalar("norms/dec_grad_clipped"+name, self.gnorm_dec_it_clipped/self.n_miniBatch)
+        tfs.scalar("norms/RNN_grad_clipped"+name, self.gnorm_RNN_it_clipped/self.n_miniBatch)
+        tfs.scalar("norms/word_module_grad_clipped"+name, self.gnorm_wordModule_it_clipped/self.n_miniBatch)
+        tfs.scalar("norms/enc_grad_clipped"+name, self.gnorm_enc_it_clipped/self.n_miniBatch)
+
+        print("iterartion",it,self.loss_struct /self.n_miniBatch,self.loss_word /self.n_miniBatch,
+              self.loss_POS /self.n_miniBatch)

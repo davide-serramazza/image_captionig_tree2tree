@@ -4,56 +4,69 @@ import numpy as np
 import tensorflow as tf
 import os
 
-def read_images(imgs_dir_file,cnn,tree_cnn_type):
+def read_images(imgs_dir_file,cnn,tree_cnn_type,batch_size):
     """
     function that read images form file
     :param imgs_file:
     :return:
     """
-    data = []
-    if cnn==None:
-        #open file and read lines
-        f= open(imgs_dir_file,"r")
+    def read_tree_images(data, imgs_dir_file, tree_cnn_type):
+        # open file and read lines
+        f = open(imgs_dir_file, "r")
         while True:
             # create dict
-            dict ={}
+            dict = {}
 
             line = f.readline()
-            if line=="":
-                #if i'm here file is ended
+            if line == "":
+                # if i'm here file is ended
                 break
 
             tmp = line.split(sep=":")
 
-            #fill dict, begin with name
+            # fill dict, begin with name
             dict["name"] = tmp[0][:-1]
-            #remove image name form string and split it
-            line = line[len(dict["name"])+2:]
+            # remove image name form string and split it
+            line = line[len(dict["name"]) + 2:]
             tmp = line.split(sep="data")
 
-            #create a dummy root
-            tree = reconstruct_tree(data, tmp,tree_cnn_type)
+            # create a dummy root
+            tree = reconstruct_tree(data, tmp, tree_cnn_type)
             label_with_node_type(tree, dict["name"])
-            if tree_cnn_type=="inception":
-                tree.node_type_id="root"
+            if tree_cnn_type == "inception":
+                tree.node_type_id = "root"
             dict["img_tree"] = tree
 
             data.append(dict)
-    else:
-        files = os.listdir(imgs_dir_file)
-        for file in files:
-            name= file[:-4]
-            img = tf.io.read_file(imgs_dir_file+"/"+file)
-            img = tf.image.decode_jpeg(img, channels=3)
-            img = tf.image.resize_images(img,size=(299,299)) #non riesco a fare resize
-            img = tf.keras.applications.inception_v3.preprocess_input(img)
-            img = tf.expand_dims(img,axis=0)
-            batch_features = cnn(img)
-            batch_features = tf.reshape(batch_features,(batch_features.shape[0], -1, batch_features.shape[3]))
-            img = None
-            data.append({"name" : name, "img":batch_features})
-    return data
 
+    def read_flat_images(cnn, data, imgs_dir_file,batch_size):
+        files = os.listdir(imgs_dir_file)
+        for i in range(0,len(files),batch_size):
+            curr_batch=[]
+            for j in range(i,min(len(files),i+batch_size)):
+                file = files[j]
+                data.append({'name' : file[:-4]})
+                curr_img = tf.io.read_file(imgs_dir_file + "/" + file)
+                curr_img = tf.image.decode_jpeg(curr_img, channels=3)
+                curr_img = tf.image.resize_images(curr_img, size=(299, 299))
+                curr_img  =tf.keras.applications.inception_v3.preprocess_input(curr_img)
+                curr_batch.append(curr_img)
+            curr_batch = tf.convert_to_tensor(curr_batch)
+            batch_features = cnn(curr_batch)
+            pool = tf.keras.layers.AveragePooling2D(
+                pool_size=(8, 8))  # tf.reshape(batch_features,(batch_features.shape[0], -1, batch_features.shape[3]))
+            batch_features = pool(batch_features)
+            batch_features = tf.reshape(batch_features, shape=(batch_features.shape[0],2048))
+            for j in range(batch_features.shape[0]):
+                data[i+j]['img'] = batch_features[j]
+
+    data = []
+
+    if cnn==None:
+        read_tree_images(data, imgs_dir_file, tree_cnn_type)
+    else:
+        read_flat_images(cnn, data, imgs_dir_file,batch_size)
+    return data
 
 def label_with_node_type(tree,name):
     n = len(tree.children)

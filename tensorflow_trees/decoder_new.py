@@ -196,7 +196,7 @@ class Decoder(tf.keras.Model):
                                              output_dim=WordValue.embedding_size, name="embedding")
         self.rnn =tf.keras.layers.CuDNNLSTM(units=hidden_word, return_state=True, return_sequences=True, name="LSTM")
         self.final_layer = tf.keras.layers.Dense(WordValue.representation_shape, activation="linear",
-                                                 name="final_word_pred_layer")
+                                             name="final_word_pred_layer")
 
         # if not attr, they don't get registered as variable by the keras model (dunno why)
         for t in tree_def.node_types:
@@ -329,7 +329,7 @@ class Decoder(tf.keras.Model):
                     vals = infl.compiled_call(inp)
                 else:
                     vals = words_predictions(self.emb,self.rnn,self.final_layer,batch_idxs,
-                                             inp,targets,TR, batch.root_embeddings, self.root_only_in_fist_LSTM_time,perm2usort,n_it=n_it)
+                        inp,targets,TR, batch.root_embeddings, self.root_only_in_fist_LSTM_time,perm2usort,n_it=n_it)
                     #if current nodes are words, "unsort matrix contaning it i.e. go back to order expected
                     #by following code
 

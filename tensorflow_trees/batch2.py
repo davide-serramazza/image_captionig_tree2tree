@@ -3,7 +3,7 @@ import tensorflow.contrib.summary as tfs
 import typing as T
 from tensorflow_trees.definition import Tree, TreeDefinition, NodeDefinition
 from functools import reduce
-
+import numpy as np
 
 class BatchOfTrees:
     def __init__(self):
@@ -205,12 +205,14 @@ class BatchOfTreesForDecoding(BatchOfTrees):
         d_loss = tf.reduce_mean(sample_distrib_error)
 
         v_loss = {}
+        mean = {}
         for k in value.keys():
             if len(value[k]) > 0 and k not in ignore_values:
                 vt = self.tree_def.id_map[k].value_type
                 all_value_gt = vt.abstract_to_representation_batch(value_gt[k])
                 all_value_gen = tf.gather(self['vals_' + k], value[k])
 
+                mean[k] = np.mean(np.max(tf.nn.softmax(all_value_gen),axis=-1))
                 if vt.class_value:
                     vk_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
                         labels=all_value_gt,
@@ -220,10 +222,10 @@ class BatchOfTreesForDecoding(BatchOfTrees):
 
                 reduced = tf.reduce_mean(vk_loss, axis=-1)
 
-                #tfs.scalar("loss/tr/values/"+k, reduced)
+                tfs.scalar("loss/tr/values/"+k, reduced)
                 v_loss[k] = reduced   # TODO handle the mixing of losses from different domain (i.e. properly weight them)
 
-        return d_loss, v_loss
+        return d_loss, v_loss, mean
 
     def BuildDeferredRepresentationValueType(batch, node_type: NodeDefinition):
 
