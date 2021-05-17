@@ -8,6 +8,12 @@ import myCode.shared_POS_words_lists as shared_list
 from random import shuffle
 from helper_functions import Summary
 
+from pycocoevalcap.bleu.bleu import Bleu
+from pycocoevalcap.meteor.meteor import Meteor
+from pycocoevalcap.rouge.rouge import Rouge
+from pycocoevalcap.cider.cider import Cider
+from pycocoevalcap.spice.spice import Spice
+
 
 def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,lamb,clipping,batch_size, flat_val_captions, tensorboard_name,
@@ -97,30 +103,80 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 # sampling
                 batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True)
                 pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
-                bleu_1 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1.0,))
-                bleu_2 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.5,0.5))
-                bleu_3 = corpus_bleu(flat_val_captions,pred_sentences,weights=(1/3,1/3,1/3))
-                bleu_4 = corpus_bleu(flat_val_captions,pred_sentences,weights=(0.25,0.25,0.25,0.25))
-                print("sampling" , bleu_1, bleu_2, bleu_3,bleu_4)
-                tfs.scalar("bleu/blue-1", bleu_1)
-                tfs.scalar("bleu/blue-2", bleu_2)
-                tfs.scalar("bleu/blue-3", bleu_3)
-                tfs.scalar("bleu/blue-4", bleu_4)
 
+                refs = dict()
+                preds = dict()
+                j=0
+                for pred,ref in zip(pred_sentences,flat_val_captions):
+                    p = ""
+                    r = []
+                    for el in pred:
+                        p += el+" "
+                    preds[j]=[p]
+
+                    for single_ref in ref:
+                        tmp= ""
+                        for el in single_ref[:-1]:
+                            tmp+=el+" "
+                        r.append(tmp)
+                    refs[j]=r
+
+                    j+=1
+
+                scores = [Bleu(4) , Meteor() , Cider() ]
+                ris = dict()
+                for scorer in scores:
+                    score, scores = scorer.compute_score(refs,preds)
+                    ris[scorer.method()] =  score
+
+                print("sampling" , ris)
+                tfs.scalar("metrics/bleu/blue-1", ris['Bleu'][0])
+                tfs.scalar("metrics/bleu/blue-2",  ris['Bleu'][1])
+                tfs.scalar("metrics/bleu/blue-3",  ris['Bleu'][2])
+                tfs.scalar("metrics/bleu/blue-4",  ris['Bleu'][3])
+                tfs.scalar("metrics/CIDEr", ris['CIDEr'])
+                tfs.scalar("metrics/METEOR", ris['METEOR'])
 
 
                 # beam
                 batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)
                 pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees)
-                bleu_1_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1.0,))
-                bleu_2_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.5,0.5))
-                bleu_3_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(1/3,1/3,1/3))
-                bleu_4_b = corpus_bleu(flat_val_captions,pred_sentences_b,weights=(0.25,0.25,0.25,0.25))
-                tfs.scalar("bleu/blue-1_b", bleu_1_b)
-                tfs.scalar("bleu/blue-2_b", bleu_2_b)
-                tfs.scalar("bleu/blue-3_b", bleu_3_b)
-                tfs.scalar("bleu/blue-4_b", bleu_4_b)
-                print("beam    " , bleu_1_b, bleu_2_b, bleu_3_b,bleu_4_b, "\n")
+
+                refs = dict()
+                preds = dict()
+                j=0
+                for pred,ref in zip(pred_sentences_b,flat_val_captions):
+                    p = ""
+                    r = []
+                    for el in pred:
+                        p += el+" "
+                    preds[j]=[p]
+
+                    for single_ref in ref:
+                        tmp= ""
+                        for el in single_ref[:-1]:
+                            tmp+=el+" "
+                        r.append(tmp)
+                    refs[j]=r
+
+                    j+=1
+
+                scores = [Bleu(4) , Meteor() , Cider() ]
+
+                ris_b = dict()
+                for scorer in scores:
+                    score, scores = scorer.compute_score(refs,preds)
+                    ris_b[scorer.method()] =  score
+
+
+                tfs.scalar("metrics/bleu/blue-1_b", ris_b['Bleu'][0])
+                tfs.scalar("metrics/bleu/blue-2_b",  ris_b['Bleu'][1])
+                tfs.scalar("metrics/bleu/blue-3_b",  ris_b['Bleu'][2])
+                tfs.scalar("metrics/bleu/blue-4_b",  ris_b['Bleu'][3])
+                tfs.scalar("metrics/CIDEr_b", ris_b['CIDEr'])
+                tfs.scalar("metrics/METEOR_b", ris_b['METEOR'])
+
+                print("beam    " , ris_b, "\n")
 
 
                 s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
@@ -134,7 +190,6 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
                 print("iteration ", i, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
                     "that is a perc of", (matched_pos_uns/tot_pos_uns)*100, " " ,matched_word_uns, " out of ",total_word_uns,
-                      "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg,
-                      " bleu-1 ", bleu_1," bleu-2 ", bleu_2," bleu-3 ", bleu_3," bleu-4 ", bleu_4)
+                      "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg)
 
                 del target_val
