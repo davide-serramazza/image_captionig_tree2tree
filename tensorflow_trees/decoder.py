@@ -5,8 +5,6 @@ from tensorflow_trees.definition import TreeDefinition, Tree, TrainingTree, Node
 from tensorflow_trees.batch import BatchOfTreesForDecoding
 from tensorflow_trees.decoder_cells import GatedFixedArityNodeDecoder, ParallelDense
 from myCode.word_processing import *
-from myCode.tree_defintions import WordValue
-from myCode.RNN_decoder import NIC_Decoder
 
 class DecoderCellsBuilder:
     """ Define interfaces and simple implementations for a cells builder, factory used for the decoder modules.
@@ -160,7 +158,7 @@ class Decoder(tf.keras.Model):
     def __init__(self, *,
                  tree_def: TreeDefinition = None, embedding_size: int = None,
                  max_depth: int = None, max_arity: int = None, cut_arity: int = None,
-                 cellsbuilder: DecoderCellsBuilder = None, max_node_count: int = 1000, take_root_along=True,
+                 cellsbuilder: DecoderCellsBuilder = None, max_node_count: int = 1000,
                  variable_arity_strategy="FLAT",word_module):
         """
         :param tree_def:
@@ -169,7 +167,6 @@ class Decoder(tf.keras.Model):
         :param max_arity: limit the max arity of the generated tree, must be more than any provided tree
         :param cellsbuilder:
         :param max_node_count: limit the number of ndoe when unsupervised - avoid children nodes explosion
-        :param take_root_along: whether to concat initial embedding at every step
         :param variable_arity_strategy: FLAT | REC .
         """
         super(Decoder, self).__init__()
@@ -193,9 +190,6 @@ class Decoder(tf.keras.Model):
 
         self.all_types = self.tree_def.node_types
         self.all_types_idx = {t.id: i for t, i in zip(self.all_types, range(len(self.all_types)))}
-
-        self.take_root_along = take_root_along
-
         self.word_module = word_module
 
         # if not attr, they don't get registered as variable by the keras model (dunno why)
@@ -310,7 +304,7 @@ class Decoder(tf.keras.Model):
 
             # add to the input  the root embedding
             root_embs = tf.gather(batch.root_embeddings, batch_idxs)
-            if self.take_root_along and op_id=="POS_tag":
+            if op_id=="POS_tag":
                 inp = tf.concat([inp, root_embs], axis=1)
 
             # add to the input informations about the node type TODO not sure this is needed

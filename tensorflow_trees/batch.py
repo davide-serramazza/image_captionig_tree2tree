@@ -1,5 +1,4 @@
 import tensorflow as tf
-import tensorflow.contrib.summary as tfs
 import typing as T
 from tensorflow_trees.definition import Tree, TreeDefinition, NodeDefinition
 from functools import reduce

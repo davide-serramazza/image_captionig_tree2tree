@@ -26,7 +26,6 @@ def main():
     max_node_count = 200
     max_depth =  20
     cut_arity = 5
-    parser.add_argument('lambd', type=float, help="coefficient of penalization on encoder representation")
     parser.add_argument('beta', type=float, help="coefficient for L2 reg.")
     parser.add_argument('hidden_coeff', type=float, help="coefficient for hidden dimension of encoder and decoder layer")
     learning_rate = 0.0001
@@ -67,11 +66,11 @@ def main():
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
     print("begin train")
-    name = "emb_dim_"+str(args.emb_tree_word_size)+"_rnn_units_"+str(args.rnn_unit_size)+"_lambda_"+str(args.lambd)+ \
+    name = "emb_dim_"+str(args.emb_tree_word_size)+"_rnn_units_"+str(args.rnn_unit_size)+ \
            " _beta_"+str(args.beta)+"_hidden_coeff_"+str(args.hidden_coeff)[2:]+"_drop_rate_" + str(args.drop_rate)
     train_model(FLAGS=FLAGS, decoder=decoder,
                 encoder=encoder, train_data=train_data, val_data=val_data, optimizer=optimizer,
-                beta=args.beta, lamb=args.lambd, clipping=clipping, batch_size=batch_size,
+                beta=args.beta, clipping=clipping, batch_size=batch_size,
                 tree_encoder =not(image_tree==None), tree_decoder = not(sentence_tree==None),
                 flat_val_captions=flat_val_captions, tensorboard_name=name)
 

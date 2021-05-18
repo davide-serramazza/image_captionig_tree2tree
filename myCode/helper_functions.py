@@ -179,12 +179,11 @@ class Summary ():
 
 
     def add_miniBatch_summary(self,loss_struct_miniBatch,loss_value_miniBatch,loss_value_miniBatch_pos,loss_value_miniBatch_word,
-                              h_norm,w_norm,gnorm,grad,grad_clipped,variables):
+                              w_norm,gnorm,grad,grad_clipped,variables):
         self.loss_struct += loss_struct_miniBatch
         self.loss_value += loss_value_miniBatch
         self.loss_POS += loss_value_miniBatch_pos
         self.loss_word +=  loss_value_miniBatch_word
-        self.h_norm_it += h_norm
         self.w_norm_it += w_norm
 
         enc_v=[]
@@ -250,3 +249,47 @@ class Summary ():
 
         print("iterartion",it,self.loss_struct /self.n_miniBatch,self.loss_word /self.n_miniBatch,
               self.loss_POS /self.n_miniBatch)
+
+        return self.loss_word /self.n_miniBatch, self.loss_POS /self.n_miniBatch
+
+    def print_supervised_validation_summary(self,loss_struct_val, loss_validation,loss_values_validation_pos,
+            loss_values_validation_word,loss_word, loss_POS,it):
+
+        tfs.scalar("loss/validation/loss_struc", loss_struct_val)
+        tfs.scalar("loss/validation/loss_value", loss_validation)
+        tfs.scalar("loss/validation/loss_value_POS", loss_values_validation_pos)
+        tfs.scalar("loss/validation/loss_value_word", loss_values_validation_word)
+
+        print("iteration ", it, " supervised:\nloss train word is ", loss_word, " loss train POS is ", loss_POS , "\n",
+              " loss validation word is ", loss_values_validation_word, " loss validation POS is ", loss_values_validation_pos)
+
+
+    def print_unsupervised_validation_summary(self,res,res_b, s_avg, v_avg,tot_pos_uns,matched_pos_uns,total_word_uns,
+                matched_word_uns,it):
+
+            tfs.scalar("metrics/bleu/blue-1", res['Bleu'][0])
+            tfs.scalar("metrics/bleu/blue-2",  res['Bleu'][1])
+            tfs.scalar("metrics/bleu/blue-3",  res['Bleu'][2])
+            tfs.scalar("metrics/bleu/blue-4",  res['Bleu'][3])
+            tfs.scalar("metrics/CIDEr", res['CIDEr'])
+            tfs.scalar("metrics/METEOR", res['METEOR'])
+            print("sampling" , res)
+
+            tfs.scalar("metrics/bleu/blue-1_b", res_b['Bleu'][0])
+            tfs.scalar("metrics/bleu/blue-2_b",  res_b['Bleu'][1])
+            tfs.scalar("metrics/bleu/blue-3_b",  res_b['Bleu'][2])
+            tfs.scalar("metrics/bleu/blue-4_b",  res_b['Bleu'][3])
+            tfs.scalar("metrics/CIDEr_b", res_b['CIDEr'])
+            tfs.scalar("metrics/METEOR_b", res_b['METEOR'])
+            print("beam    " , res_b, "\n")
+
+            tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
+            tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
+            tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
+            tfs.scalar("overlaps/unsupervised/matched_POS", matched_pos_uns)
+            tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
+            tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
+
+            print("iteration ", it, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
+                  "that is a perc of", (matched_pos_uns/tot_pos_uns)*100, " " ,matched_word_uns, " out of ",total_word_uns,
+                  "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg)

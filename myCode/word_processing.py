@@ -1,9 +1,9 @@
 import tensorflow as tf
 import numpy as np
-import sys
 
 def get_ordered_nodes(embeddings, ops,TR, trees):
     """
+    #TODO man
     function to sort nodes and corresponding target words (before processing them)
     :param embeddings: all node embeddings
     :param ops:list of item to select among the wall node embeddings
@@ -16,33 +16,33 @@ def get_ordered_nodes(embeddings, ops,TR, trees):
     node_numb = [o.meta['node_numb'] for o in ops]
 
     if TR:
-        #compute permutation to sort it and to "unsort" it
+        # compute permutation to sort it and to "unsort" it
         perm2sort = np.argsort(node_numb)
         perm2unsort = inv(perm2sort)
-        #take targets and check its length, sort them if we are in TR
+        # take targets and check its length, sort them if we are in TR
         targets = [o.meta['target'].value.representation for o in ops]
         assert len(node_numb) == len(targets)
         targets = [targets[i] for i in perm2sort]
-        #sort nodes, targets and get batch_idxs and input
+        # sort nodes, targets and get batch_idxs and input
         node_numb = [node_numb[i] for i in perm2sort]
         ops = [ops[i] for i in perm2sort]
         batch_idxs = [o.meta['batch_idx'] for o in ops]
         inp =tf.gather(embeddings, node_numb)
     else:
-        #build list to return
+        # build list to return
         targets=[]
         batch_idxs = []
-        leafs_ordered = []
+        leaves_ordered = []
         for tree in trees:
-            leafs_ordered.append([])
-        #get leafs ordered
+            leaves_ordered.append([])
+        # get leaves ordered
         for tree in trees:
-            get_ordered_leafs(tree,leafs_ordered)
-        #build batch idx, inp and perm2unsort
-        for i in range(0, len(leafs_ordered)):
-            for el in leafs_ordered[i]:
+            get_ordered_leafs(tree,leaves_ordered)
+        # build batch idx, inp and perm2unsort
+        for i in range(0, len(leaves_ordered)):
+            for el in leaves_ordered[i]:
                 batch_idxs.append(i)
-        nodes_to_take = [node_numb for l in leafs_ordered for node_numb in l]
+        nodes_to_take = [node_numb for l in leaves_ordered for node_numb in l]
         inp = tf.gather(embeddings,nodes_to_take)
         perm2unsort = np.argsort(nodes_to_take)
 
@@ -57,6 +57,7 @@ def get_ordered_nodes(embeddings, ops,TR, trees):
 #######################
 def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,perm2unsort,samp):
     """
+    #TODO man
     function taking care of the wall word prediction (it calls several other functions)
     :param embedding:
     :param rnn:
@@ -90,6 +91,7 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,perm2u
 #TODO handle root in each time stamp
 def zip_data(inp, sentences_len, targets,TR):
     """
+    #TODO man
     function to get data in format expected by RNN i.e. (n_senteces)*(sen_max_lenght)*(representation_size)
     :param inp:  input as 2D matrix
     :param sentences_len:  list of sentences length
@@ -136,6 +138,7 @@ def zip_data(inp, sentences_len, targets,TR):
 
 def unzip_data(predictions,sentences_len,perm2unsort,samp):
     """
+    #TODO man
     function to unzip rnn result i.e. go back in representation as 2D matrix and go back to previous order of nodes
     :param predictions:
     :param sentences_len:
@@ -167,6 +170,7 @@ def unzip_data(predictions,sentences_len,perm2unsort,samp):
 ######################
 
 def inv(perm):
+    #TODO man
     """
     function returning inverse of given permutation
     :param perm:
@@ -178,6 +182,7 @@ def inv(perm):
     return inverse
 
 def get_sentences_length(batch_idxs,TR):
+    #TODO man
     """
     function to get sentences length starting from batch_idxs
     :param batch_idxs:
@@ -203,6 +208,7 @@ def get_sentences_length(batch_idxs,TR):
     return np.asarray(sentences_len)
 
 def get_ordered_leafs(tree, l : list):
+    #TODO man
     """
     function to get ordered leafs from left to right
     :param tree: tree to visit

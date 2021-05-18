@@ -6,6 +6,7 @@ import os
 
 def read_images(imgs_dir_file,cnn,tree_cnn_type,batch_size):
     """
+    #TODO man
     function that read images form file
     :param imgs_file:
     :return:
@@ -139,6 +140,7 @@ def reconstruct_tree(data, tmp,tree_cnn_type):
 
 def get_node_value(str):
     """
+    #TODO man
     function converting single line of file as tf vector
     :param str:
     :return:

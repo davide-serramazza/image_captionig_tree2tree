@@ -7,6 +7,7 @@ from os.path import join
 
 def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
     """
+    #TODO man
     function that count word occurency in dataset
     :param sen_tree:
     :param word_dict:
@@ -28,6 +29,7 @@ def count_word_tag_occ(sen_tree : ET.Element ,  words_occ : list):
 
 def read_tree_from_file(file):
     """
+    #TODO man
     function that read parse tree from xml file
     :param file:
     :param embeddings:
