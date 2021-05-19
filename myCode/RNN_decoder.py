@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import myCode.shared_POS_words_lists as shared_list
 
 class NIC_Decoder(tf.keras.Model):
     def __init__(self,embedding_dim, units, vocab_size,drop_rate,beam):
@@ -27,23 +28,31 @@ class NIC_Decoder(tf.keras.Model):
         rnn_input = word_embs
 
         # call LSTM
-        states = [tf.zeros(shape=(pos_embs.shape[0],self.units))]*2
+        states = [tf.zeros(shape=(images_emb.shape[0],self.units))]*2
         rnn_output,state_h,state_c= self.rnn(rnn_input, initial_state = states, training=True)
         rnn_output = self.drop_final(rnn_output,training=True)
         predictions = self.final_layer(rnn_output)
 
         return predictions
 
-    def sampling(self,features,pos_embs):
+    def sampling(self,features,pos_embs=None,max_length=None):
 
-        states = [tf.zeros(shape=(pos_embs.shape[0], self.units))] * 2
-        max_length = pos_embs.shape[1]
+        states = [tf.zeros(shape=(features.shape[0], self.units))] * 2
+        if max_length is not None:
+            end_token = shared_list.tokenizer.word_index['<end>']
+            end_generation =[False]*features.shape[0]
+        max_length = pos_embs.shape[1] if max_length==None else max_length
         to_return=[]
+
 
         # sampling of all words in parallel
         for i in range(max_length):
             if i==0:
                 current_word_embs = tf.expand_dims(features, axis=1)
+            elif i==1 and max_length is not None:
+                start_token = shared_list.tokenizer.word_index['<start>']
+                start_vectors = tf.expand_dims(tf.tile([start_token],multiples=[features.shape[0]]),axis=-1)
+                current_word_embs = self.embedding_layer(start_vectors)
             else:
                 current_word_embs= self.embedding_layer(tf.argmax(predictions, axis=-1))
             rnn_inputs = current_word_embs
@@ -52,6 +61,12 @@ class NIC_Decoder(tf.keras.Model):
 
             predictions=self.final_layer(rnn_output)
             to_return.append(predictions)
+
+            ended_sequences = tf.where(tf.equal( tf.squeeze(tf.argmax(predictions,axis=-1)) , end_token))
+            for idx in ended_sequences:
+                end_generation[idx]=True
+            if all(end_generation):
+                break
 
         to_return = tf.concat([item for item in to_return],axis=1)
         return to_return

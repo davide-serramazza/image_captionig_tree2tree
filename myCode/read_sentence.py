@@ -80,16 +80,16 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
         label_tree_with_real_data(child_xml, child_real,tokenizer)
 
 
-def label_tree_with_sentenceTree(dev_data, tes_data, base_path):
+def label_tree_with_sentenceTree(dev_data, test_data, base_path):
     """
     function that given a tree (target for NN one) without sentence "label" it also with it
     :param dev_data:
-    :param tes_data:
+    :param test_data:
     :param base_path:
     :return:
     """
     #read xml file first
-    for data in dev_data+tes_data:
+    for data in dev_data+test_data:
         name = data['name']
         #after got file name, read tree from xml file
         captions = []
@@ -105,6 +105,28 @@ def label_tree_with_sentenceTree(dev_data, tes_data, base_path):
     TagValue.update_rep_shape(len(shared_list.tags_idx))
     extraxt_topK_words(word_occ,filters="~")
     del word_occ
+
+def get_flat_captions(dev_data,test_data,targets):
+    captions = []
+    for data in dev_data+test_data:
+        name = data['name']
+        data['sentences'] = targets[name]
+        if data in dev_data:
+            for sentence in  targets[name]:
+                captions.append( '<start> ' + sentence + ' <end>' )
+
+    #count occurency of words
+    tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=10000000, oov_token="<unk>", filters='~')
+    tokenizer.fit_on_texts(captions)
+    top_k = len(list(filter(lambda el: el[1] >= 10, tokenizer.word_counts.items())))
+
+    tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters='~')
+    tokenizer.fit_on_texts(captions)
+    tokenizer.word_index['<pad>'] = 0
+    tokenizer.index_word[0] = '<pad>'
+
+    shared_list.tokenizer = tokenizer
+    WordValue.update_rep_shape(top_k)
 
 def extraxt_topK_words(word_occ,filters):
     top_k = 10000000

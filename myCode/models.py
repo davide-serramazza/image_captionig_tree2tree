@@ -26,7 +26,7 @@ def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_nod
     WordValue.set_embedding_size(emb_word_size)
 
     if sentence_tree==None:
-        decoder = RNN_Decoder(emb_word_size,hidden_word,WordValue.representation_shape)
+        decoder = NIC_Decoder(WordValue.embedding_size,hidden_word,WordValue.representation_shape,drop_rate,beam=20)
     else:
         decoder = Decoder(tree_def=sentence_tree.tree_def, embedding_size=emb_tree_size, max_arity=max_arity,max_depth=max_depth,
                           max_node_count=max_node_count, cut_arity=cut_arity, variable_arity_strategy="FLAT",

@@ -29,7 +29,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 with tfe.GradientTape() as tape:
 
                     summary = Summary(train=True)
-                    current_batch_input, current_batch_target = get_input_target_minibatch(train_data,j,batch_size,tree_encoder)
+                    current_batch_input, current_batch_target = get_input_target_minibatch(train_data,j,batch_size,tree_encoder,tree_decoder)
 
                     # encode and decode datas
                     batch_enc = encoder(current_batch_input,training=True)
@@ -41,8 +41,9 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                         loss_value__miniBatch = loss_values_miniBatch["POS_tag"] + loss_values_miniBatch["word"]
                         loss_miniBatch = loss_value__miniBatch+loss_struct_miniBatch
                     else:
-                        pass
-
+                        batch_dec = decoder.call([], root_emb, current_batch_target)
+                        all_words_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=current_batch_target,logits=batch_dec)
+                        loss_miniBatch=tf.reduce_mean( tf.reduce_mean(all_words_loss,axis=-1), axis=-1)
                     variables = encoder.variables + decoder.variables
 
                     #compute h and w norm for regularization
@@ -55,13 +56,14 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     # apply optimizer on gradient
                     optimizer.apply_gradients(zip(grad_clipped, variables), global_step=tf.train.get_or_create_global_step())
                     summary.add_miniBatch_summary(loss_struct_miniBatch,loss_value__miniBatch,loss_values_miniBatch["POS_tag"],
-                        loss_values_miniBatch["word"],w_norm,gnorm,grad,grad_clipped,variables)
+                        loss_values_miniBatch["word"],w_norm,gnorm,grad,grad_clipped,variables) if tree_decoder else \
+                    summary.add_miniBatch_summary(None,None,None,loss_miniBatch,w_norm,gnorm,grad,grad_clipped,variables)
 
 
             loss_word, loss_POS = summary.print_summary(i)
             # print stats
             if i % FLAGS.check_every == 0:
-                input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data),tree_encoder)
+                input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data),tree_encoder,tree_decoder)
 
                 if not tree_encoder:
                     input_val = tf.Variable(input_val)
@@ -71,16 +73,19 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 if tree_encoder:
                     batch_val_enc = batch_val_enc.get_root_embeddings()
 
-                batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,training=False,samp=True)
-                loss_struct_val, loss_values_validation = batch_val_dec.reconstruction_loss()
-                loss_validation = loss_struct_val + loss_values_validation["POS_tag"]+loss_values_validation["word"]
+                if tree_decoder:
+                    batch_val_dec = decoder(encodings=batch_val_enc,targets=target_val,training=False,samp=True)
+                    loss_struct_val, loss_values_validation = batch_val_dec.reconstruction_loss()
+                    loss_validation = loss_struct_val + loss_values_validation["POS_tag"]+loss_values_validation["word"]
 
-                summary.print_supervised_validation_summary(loss_struct_val, loss_validation,loss_values_validation["POS_tag"],
-                        loss_values_validation["word"],loss_word, loss_POS,i)
+                    summary.print_supervised_validation_summary(loss_struct_val, loss_validation,loss_values_validation["POS_tag"],
+                            loss_values_validation["word"],loss_word, loss_POS,i)
 
                 #get unsupervised validation loss
                 # first sampling
-                batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True)
+                batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True) if tree_decoder else   \
+                    decoder.sampling(features=batch_val_enc,max_length=50)
+                #TODO max_lenght hard coded tirarla fuori da caption dei dati, usare argomenti opzionali
                 pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
 
 

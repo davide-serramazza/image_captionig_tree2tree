@@ -4,7 +4,7 @@ import tensorflow as tf
 import json
 from random import  choice
 from tensorflow_trees.definition import Tree
-from myCode.read_sentence import label_tree_with_real_data
+from myCode.read_sentence import label_tree_with_real_data, get_flat_captions
 import myCode.shared_POS_words_lists as shared_list
 import xml.etree.ElementTree as ET
 import tensorflow.contrib.summary as tfs
@@ -23,9 +23,8 @@ def istanciate_CNN(tree_encoder):
         image_features_extract_model = None
     return image_features_extract_model
 
-def load_flat_captions(json_file,val_data):
-    with open(json_file) as json_file:
-        data = json.load(json_file)
+def load_flat_captions(data,val_data):
+
     val_all_captions = []
     for el in val_data:
         name = el["name"]
@@ -45,9 +44,18 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
         train_data = train_data+val_data
         val_data = test_data
     print('loading sentence trees...')
+    with open(args.all_captions) as json_file:
+        flat_captions = json.load(json_file)
     if tree_decoder:
         label_tree_with_sentenceTree(train_data,val_data, args.targets)
-    flat_val_caption = load_flat_captions(args.all_captions,val_data)
+    else:
+        get_flat_captions(train_data,val_data, flat_captions)
+
+    if tree_decoder:
+        flat_val_caption = load_flat_captions(flat_captions,val_data)
+    else:
+        flat_val_caption=None
+
     return train_data,val_data,flat_val_caption
 
 
@@ -116,7 +124,7 @@ def extract_words_from_tree(trees):
     return to_return
 
 
-def compute_max_arity(train_data,val_data,tree_encoder):
+def compute_max_arity(train_data,val_data,tree_encoder,tree_decoder):
     image_max_arity=0
     sen_max_arity=0
     for el in train_data+val_data:
@@ -125,14 +133,15 @@ def compute_max_arity(train_data,val_data,tree_encoder):
             if current_img_arity>image_max_arity:
                 image_max_arity=current_img_arity
 
-        for caption in el['sentences']:
-            current_sen_arity= get_sen_arity(caption)
-            if current_sen_arity>sen_max_arity:
-                sen_max_arity=current_sen_arity
+        if tree_decoder:
+            for caption in el['sentences']:
+                current_sen_arity= get_sen_arity(caption)
+                if current_sen_arity>sen_max_arity:
+                    sen_max_arity=current_sen_arity
     return image_max_arity, sen_max_arity
 
 
-def get_input_target_minibatch(data,j,batch_size,tree_encoder):
+def get_input_target_minibatch(data,j,batch_size,tree_encoder,tree_decoder):
     images=[]
     captions=[]
     for i in range( j,min( j+batch_size,len(data) ) ):
@@ -142,15 +151,21 @@ def get_input_target_minibatch(data,j,batch_size,tree_encoder):
         else:
             images.append(el['img'])
         # choose a random caption
-        caption = choice(el['sentences'])
-
-        #build the tree now
-        sentence_tree = Tree(node_type_id="dummy root", children=[],value="dummy")
-        label_tree_with_real_data(caption, sentence_tree,shared_list.tokenizer)
-        captions.append( sentence_tree.children[0] )
+        if tree_decoder:
+            caption = choice(el['sentences'])
+            #build the tree now
+            sentence_tree = Tree(node_type_id="dummy root", children=[],value="dummy")
+            label_tree_with_real_data(caption, sentence_tree,shared_list.tokenizer)
+            captions.append( sentence_tree.children[0] )
+        else:
+            captions.append('<start> ' + choice(el['sentences']) + ' <end>' )
 
     if not tree_encoder:
         images  = tf.convert_to_tensor(images)
+    if not tree_decoder:
+        all_captions = shared_list.tokenizer.texts_to_sequences(captions)
+        cap_vector = tf.keras.preprocessing.sequence.pad_sequences(all_captions, padding='post')
+        captions = tf.convert_to_tensor(cap_vector)
     return images,captions
 
 class Summary ():
@@ -180,9 +195,11 @@ class Summary ():
 
     def add_miniBatch_summary(self,loss_struct_miniBatch,loss_value_miniBatch,loss_value_miniBatch_pos,loss_value_miniBatch_word,
                               w_norm,gnorm,grad,grad_clipped,variables):
-        self.loss_struct += loss_struct_miniBatch
-        self.loss_value += loss_value_miniBatch
-        self.loss_POS += loss_value_miniBatch_pos
+
+        if loss_struct_miniBatch is not None:
+            self.loss_struct += loss_struct_miniBatch
+            self.loss_value += loss_value_miniBatch
+            self.loss_POS += loss_value_miniBatch_pos
         self.loss_word +=  loss_value_miniBatch_word
         self.w_norm_it += w_norm
 

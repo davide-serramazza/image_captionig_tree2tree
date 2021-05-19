@@ -54,14 +54,14 @@ def main():
     tree_decoder = os.path.isdir(args.targets)
     sentence_tree = SentenceTree() if tree_decoder else None
     train_data, val_data, flat_val_captions = load_data(args, tree_encoder, tree_decoder, cnn_type, batch_size)
-    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data,tree_encoder)
+    image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data,tree_encoder,tree_decoder)
     print(image_max_arity,sen_max_arity)
 
     activation = getattr(tf.nn, FLAGS.activation)
     decoder, encoder = get_encoder_decoder(emb_tree_size=args.emb_tree_word_size,cut_arity=cut_arity,max_arity=
     max(image_max_arity,sen_max_arity),max_node_count=max_node_count,max_depth=max_depth,hidden_coeff=args.hidden_coeff,
-                                           activation=activation,image_tree=image_tree,sentence_tree=sentence_tree,emb_word_size=args.emb_tree_word_size,
-                                           hidden_word=args.rnn_unit_size,drop_rate=args.drop_rate,drop_rate_input=args.drop_rate_input)
+                activation=activation,image_tree=image_tree,sentence_tree=sentence_tree,emb_word_size=args.emb_tree_word_size,
+                hidden_word=args.rnn_unit_size,drop_rate=args.drop_rate,drop_rate_input=args.drop_rate_input)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
