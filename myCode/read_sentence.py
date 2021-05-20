@@ -108,11 +108,14 @@ def label_tree_with_sentenceTree(dev_data, test_data, base_path):
 
 def get_flat_captions(dev_data,test_data,targets):
     captions = []
+    max_len=0
     for data in dev_data+test_data:
         name = data['name']
         data['sentences'] = targets[name]
         if data in dev_data:
             for sentence in  targets[name]:
+                if len(sentence.split(" "))>max_len:
+                    max_len=len(sentence.split(" "))
                 captions.append( '<start> ' + sentence + ' <end>' )
 
     #count occurency of words
@@ -127,6 +130,7 @@ def get_flat_captions(dev_data,test_data,targets):
 
     shared_list.tokenizer = tokenizer
     WordValue.update_rep_shape(top_k)
+    return  max_len
 
 def extraxt_topK_words(word_occ,filters):
     top_k = 10000000

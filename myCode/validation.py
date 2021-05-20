@@ -53,7 +53,7 @@ def main():
     image_tree = ImageTree(cnn_type) if tree_encoder else None
     tree_decoder = os.path.isdir(args.targets)
     sentence_tree = SentenceTree() if tree_decoder else None
-    train_data, val_data, flat_val_captions = load_data(args, tree_encoder, tree_decoder, cnn_type, batch_size)
+    train_data, val_data, flat_val_captions,sen_max_len = load_data(args, tree_encoder, tree_decoder, cnn_type, batch_size)
     image_max_arity, sen_max_arity = compute_max_arity(train_data, val_data,tree_encoder,tree_decoder)
     print(image_max_arity,sen_max_arity)
 
@@ -71,7 +71,7 @@ def main():
     train_model(FLAGS=FLAGS, decoder=decoder,
                 encoder=encoder, train_data=train_data, val_data=val_data, optimizer=optimizer,
                 beta=args.beta, clipping=clipping, batch_size=batch_size,
-                tree_encoder =not(image_tree==None), tree_decoder = not(sentence_tree==None),
+                tree_encoder =not(image_tree==None), tree_decoder = not(sentence_tree==None),sen_max_len=sen_max_len,
                 flat_val_captions=flat_val_captions, tensorboard_name=name)
 
 

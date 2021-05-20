@@ -1,6 +1,6 @@
 import tensorflow.contrib.eager as tfe
 import tensorflow.contrib.summary as tfs
-from myCode.helper_functions import extract_words_from_tree, get_input_target_minibatch
+from myCode.helper_functions import get_input_target_minibatch,extract_words_from_tree,extract_words
 from tensorflow_trees.definition import Tree
 import tensorflow as tf
 from random import shuffle
@@ -11,7 +11,7 @@ from pycocoevalcap.cider.cider import Cider
 
 
 def train_model(FLAGS, decoder, encoder, train_data,val_data,
-                optimizer, beta,clipping,batch_size, flat_val_captions, tensorboard_name,
+                optimizer, beta,clipping,batch_size, sen_max_len,flat_val_captions, tensorboard_name,
                 tree_encoder, tree_decoder):
 
     #tensorboard
@@ -31,44 +31,32 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     summary = Summary(train=True)
                     current_batch_input, current_batch_target = get_input_target_minibatch(train_data,j,batch_size,tree_encoder,tree_decoder)
 
-                    # encode and decode datas
+                    # encode and decode data
                     batch_enc = encoder(current_batch_input,training=True)
                     root_emb = batch_enc.get_root_embeddings() if tree_encoder else batch_enc
-                    if tree_decoder:
-                        batch_dec = decoder(encodings=root_emb, targets=current_batch_target,training=True,samp=True)
-                        # compute global loss
-                        loss_struct_miniBatch, loss_values_miniBatch = batch_dec.reconstruction_loss()
-                        loss_value__miniBatch = loss_values_miniBatch["POS_tag"] + loss_values_miniBatch["word"]
-                        loss_miniBatch = loss_value__miniBatch+loss_struct_miniBatch
-                    else:
-                        batch_dec = decoder.call([], root_emb, current_batch_target)
-                        all_words_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=current_batch_target,logits=batch_dec)
-                        loss_miniBatch=tf.reduce_mean( tf.reduce_mean(all_words_loss,axis=-1), axis=-1)
+                    loss_miniBatch, loss_struct_miniBatch, loss_value__miniBatch, loss_values_miniBatch = train_tree_decoder(decoder,
+                        root_emb,current_batch_target) if tree_decoder else train_flat_decoder(decoder, root_emb, current_batch_target)
+
                     variables = encoder.variables + decoder.variables
 
-                    #compute h and w norm for regularization
+                    # compute w norm for regularization
                     w_norm= tf.add_n([tf.nn.l2_loss(v) for v in variables])
 
                     # compute gradient
                     grad = tape.gradient(loss_miniBatch+ beta*w_norm , variables)
                     gnorm = tf.global_norm(grad)
                     grad_clipped,_= tf.clip_by_global_norm(grad,clipping,gnorm)
-                    # apply optimizer on gradient
+
+                    # apply gradient
                     optimizer.apply_gradients(zip(grad_clipped, variables), global_step=tf.train.get_or_create_global_step())
                     summary.add_miniBatch_summary(loss_struct_miniBatch,loss_value__miniBatch,loss_values_miniBatch["POS_tag"],
                         loss_values_miniBatch["word"],w_norm,gnorm,grad,grad_clipped,variables) if tree_decoder else \
                     summary.add_miniBatch_summary(None,None,None,loss_miniBatch,w_norm,gnorm,grad,grad_clipped,variables)
 
-
             loss_word, loss_POS = summary.print_summary(i)
-            # print stats
-            if i % FLAGS.check_every == 0:
+
+            if i % FLAGS.max_iter == 0:
                 input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data),tree_encoder,tree_decoder)
-
-                if not tree_encoder:
-                    input_val = tf.Variable(input_val)
-                    input_val = tf.squeeze(input_val)
-
                 batch_val_enc = encoder(input_val,training=False)
                 if tree_encoder:
                     batch_val_enc = batch_val_enc.get_root_embeddings()
@@ -81,12 +69,10 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                     summary.print_supervised_validation_summary(loss_struct_val, loss_validation,loss_values_validation["POS_tag"],
                             loss_values_validation["word"],loss_word, loss_POS,i)
 
-                #get unsupervised validation loss
-                # first sampling
+                # get unsupervised validation loss; first sampling
                 batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True) if tree_decoder else   \
-                    decoder.sampling(features=batch_val_enc,max_length=50)
-                #TODO max_lenght hard coded tirarla fuori da caption dei dati, usare argomenti opzionali
-                pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees)
+                    decoder.sampling(features=batch_val_enc,max_length=sen_max_len)
+                pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees) if tree_decoder else extract_words(batch_unsuperv)
 
 
 
@@ -127,7 +113,8 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
 
                 # beam
-                batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)
+                batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)  if tree_decoder else \
+                    decoder.beam_search(features=batch_val_enc,pos_embs=None, max_length=sen_max_len)
                 pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees)
 
 
@@ -168,3 +155,34 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
                 summary.print_unsupervised_validation_summary(res,res_b, s_avg, v_avg,tot_pos_uns,matched_pos_uns,total_word_uns,
                                                       matched_word_uns,i)
+
+
+def train_flat_decoder(decoder, root_emb,current_batch_target):
+    batch_dec = decoder.call([], root_emb, current_batch_target)
+
+    # compute loss among the non padded vector
+    current_batch_target = tf.unstack(current_batch_target)
+    batch_dec = tf.unstack(batch_dec)
+    targets = []
+    preds = []
+    for target, pred in zip(current_batch_target, batch_dec):
+        padding = tf.where(tf.equal(target, 0))
+        if padding.shape[0] == 0:
+            padding = tf.constant([[target.shape[0]]])
+        targets.append(target[:padding[0][0]])
+        preds.append(pred[:padding[0][0]])
+    targets = tf.concat([t for t in targets], axis=0)
+    preds = tf.concat([t for t in preds], axis=0)
+    all_words_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=targets, logits=preds)
+    loss_miniBatch = tf.reduce_mean(all_words_loss, axis=-1)
+
+    return loss_miniBatch, None, None, None
+
+
+def train_tree_decoder(decoder, root_emb,current_batch_target):
+    batch_dec = decoder(encodings=root_emb, targets=current_batch_target, training=True, samp=True)
+    # compute loss
+    loss_struct_miniBatch, loss_values_miniBatch = batch_dec.reconstruction_loss()
+    loss_value__miniBatch = loss_values_miniBatch["POS_tag"] + loss_values_miniBatch["word"]
+    loss_miniBatch = loss_value__miniBatch + loss_struct_miniBatch
+    return loss_miniBatch, loss_struct_miniBatch, loss_value__miniBatch, loss_values_miniBatch

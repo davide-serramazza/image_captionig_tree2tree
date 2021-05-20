@@ -36,11 +36,14 @@ class NIC_Decoder(tf.keras.Model):
         return predictions
 
     def sampling(self,features,pos_embs=None,max_length=None):
+        flat_decoder = max_length != None
 
         states = [tf.zeros(shape=(features.shape[0], self.units))] * 2
-        if max_length is not None:
+
+        if flat_decoder:
             end_token = shared_list.tokenizer.word_index['<end>']
             end_generation =[False]*features.shape[0]
+
         max_length = pos_embs.shape[1] if max_length==None else max_length
         to_return=[]
 
@@ -49,7 +52,7 @@ class NIC_Decoder(tf.keras.Model):
         for i in range(max_length):
             if i==0:
                 current_word_embs = tf.expand_dims(features, axis=1)
-            elif i==1 and max_length is not None:
+            elif i==1 and flat_decoder:
                 start_token = shared_list.tokenizer.word_index['<start>']
                 start_vectors = tf.expand_dims(tf.tile([start_token],multiples=[features.shape[0]]),axis=-1)
                 current_word_embs = self.embedding_layer(start_vectors)
@@ -62,11 +65,12 @@ class NIC_Decoder(tf.keras.Model):
             predictions=self.final_layer(rnn_output)
             to_return.append(predictions)
 
-            ended_sequences = tf.where(tf.equal( tf.squeeze(tf.argmax(predictions,axis=-1)) , end_token))
-            for idx in ended_sequences:
-                end_generation[idx]=True
-            if all(end_generation):
-                break
+            if flat_decoder:
+                ended_sequences = tf.where(tf.equal( tf.squeeze(tf.argmax(predictions,axis=-1)) , end_token))
+                for idx in ended_sequences:
+                    end_generation[idx]=True
+                if all(end_generation):
+                    break
 
         to_return = tf.concat([item for item in to_return],axis=1)
         return to_return

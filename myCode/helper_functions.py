@@ -47,17 +47,27 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
     with open(args.all_captions) as json_file:
         flat_captions = json.load(json_file)
     if tree_decoder:
-        label_tree_with_sentenceTree(train_data,val_data, args.targets)
+        sen_max_len = label_tree_with_sentenceTree(train_data,val_data, args.targets)
     else:
-        get_flat_captions(train_data,val_data, flat_captions)
+        sen_max_len = get_flat_captions(train_data,val_data, flat_captions)
 
-    if tree_decoder:
-        flat_val_caption = load_flat_captions(flat_captions,val_data)
-    else:
-        flat_val_caption=None
+    flat_val_caption = load_flat_captions(flat_captions,val_data)
 
-    return train_data,val_data,flat_val_caption
+    return train_data,val_data,flat_val_caption, sen_max_len
 
+
+def extract_words(predictions):
+    predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) )
+    sentences = []
+    for sen in predicted_words:
+        sentences.append([])
+        for word in sen:
+            word = shared_list.tokenizer.index_word[ word.numpy()]
+            if word=='<end>':
+                break
+            else:
+                sentences[-1].append( word )
+    return sentences
 
 #######################
 
