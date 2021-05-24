@@ -56,8 +56,8 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
     return train_data,val_data,flat_val_caption, sen_max_len
 
 
-def extract_words(predictions):
-    predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) )
+def extract_words(predictions, beam):
+    predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) ) if beam else tf.unstack( tf.argmax(predictions[:,1:,:],axis=-1) )
     sentences = []
     for sen in predicted_words:
         sentences.append([])
@@ -291,15 +291,16 @@ class Summary ():
               " loss validation word is ", loss_values_validation_word, " loss validation POS is ", loss_values_validation_pos)
 
 
-    def print_unsupervised_validation_summary(self,res,res_b, s_avg, v_avg,tot_pos_uns,matched_pos_uns,total_word_uns,
-                matched_word_uns,it):
+    def print_unsupervised_validation_summary(self,res,res_b,it,tree_decoder, s_avg=None, v_avg=None ,tot_pos_uns=None ,
+        matched_pos_uns=None,total_word_uns=None,matched_word_uns=None):
 
             tfs.scalar("metrics/bleu/blue-1", res['Bleu'][0])
             tfs.scalar("metrics/bleu/blue-2",  res['Bleu'][1])
             tfs.scalar("metrics/bleu/blue-3",  res['Bleu'][2])
             tfs.scalar("metrics/bleu/blue-4",  res['Bleu'][3])
             tfs.scalar("metrics/CIDEr", res['CIDEr'])
-            tfs.scalar("metrics/METEOR", res['METEOR'])
+            tfs.scalar("metrics/Rouge", res['Rouge'])
+            tfs.scalar("metrics/METEOR",res['METEOR'])
             print("sampling" , res)
 
             tfs.scalar("metrics/bleu/blue-1_b", res_b['Bleu'][0])
@@ -307,16 +308,18 @@ class Summary ():
             tfs.scalar("metrics/bleu/blue-3_b",  res_b['Bleu'][2])
             tfs.scalar("metrics/bleu/blue-4_b",  res_b['Bleu'][3])
             tfs.scalar("metrics/CIDEr_b", res_b['CIDEr'])
-            tfs.scalar("metrics/METEOR_b", res_b['METEOR'])
+            tfs.scalar("metrics/Rouge_b", res_b['Rouge'])
+            tfs.scalar("metrics/METEOR_b",res_b['METEOR'])
             print("beam    " , res_b, "\n")
 
-            tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
-            tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
-            tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
-            tfs.scalar("overlaps/unsupervised/matched_POS", matched_pos_uns)
-            tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
-            tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
+            if tree_decoder:
+                tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
+                tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
+                tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
+                tfs.scalar("overlaps/unsupervised/matched_POS", matched_pos_uns)
+                tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
+                tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
 
-            print("iteration ", it, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
-                  "that is a perc of", (matched_pos_uns/tot_pos_uns)*100, " " ,matched_word_uns, " out of ",total_word_uns,
-                  "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg)
+                print("iteration ", it, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
+                      "that is a perc of", (matched_pos_uns/tot_pos_uns)*100, " " ,matched_word_uns, " out of ",total_word_uns,
+                      "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg)

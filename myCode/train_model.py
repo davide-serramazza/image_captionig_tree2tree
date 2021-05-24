@@ -6,9 +6,9 @@ import tensorflow as tf
 from random import shuffle
 from helper_functions import Summary
 from pycocoevalcap.bleu.bleu import Bleu
-from pycocoevalcap.meteor.meteor import Meteor
+from pycocoevalcap.rouge.rouge import Rouge
 from pycocoevalcap.cider.cider import Cider
-
+from nltk.translate.meteor_score import meteor_score
 
 def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,clipping,batch_size, sen_max_len,flat_val_captions, tensorboard_name,
@@ -55,7 +55,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
             loss_word, loss_POS = summary.print_summary(i)
 
-            if i % FLAGS.max_iter == 0:
+            if i % FLAGS.check_every == 0:
                 input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data),tree_encoder,tree_decoder)
                 batch_val_enc = encoder(input_val,training=False)
                 if tree_encoder:
@@ -72,7 +72,8 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 # get unsupervised validation loss; first sampling
                 batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True) if tree_decoder else   \
                     decoder.sampling(features=batch_val_enc,max_length=sen_max_len)
-                pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees) if tree_decoder else extract_words(batch_unsuperv)
+                pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees) if tree_decoder else \
+                        extract_words(batch_unsuperv,beam=False)
 
 
 
@@ -100,22 +101,25 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
                     j+=1
 
-                scores = [Bleu(4) , Meteor() , Cider() ]
+                scores = [Bleu(4) , Rouge() , Cider() ]
                 res = dict()
                 for scorer in scores:
                     score, scores = scorer.compute_score(refs,preds)
                     res[scorer.method()] =  score
 
+                meteor = 0
+                for pred,ref in zip(preds.items(),refs.items()):
+                    meteor += meteor_score(ref[1],pred[1][0])
+                meteor/=len(preds)
+                res['METEOR'] = meteor
 
 
 
-
-
-
-                # beam
+            # beam
                 batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)  if tree_decoder else \
-                    decoder.beam_search(features=batch_val_enc,pos_embs=None, max_length=sen_max_len)
-                pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees)
+                    decoder.beam_search(features=batch_val_enc,pos_embs=None, sentences_len=sen_max_len,flat_decoder=True)
+                pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees) if tree_decoder else \
+                    extract_words(batch_unsuperv,beam=True)
 
 
 
@@ -140,21 +144,26 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
 
                     j+=1
 
-                scores = [Bleu(4) , Meteor() , Cider() ]
+                scores = [Bleu(4) , Rouge() , Cider() ]
 
                 res_b = dict()
                 for scorer in scores:
                     score, scores = scorer.compute_score(refs,preds)
                     res_b[scorer.method()] =  score
 
+                meteor = 0
+                for pred,ref in zip(preds.items(),refs.items()):
+                    meteor += meteor_score(ref[1],pred[1][0])
+                meteor/=len(preds)
+                res_b['METEOR'] = meteor
 
+                if tree_decoder:
+                    s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
+                        Tree.compare_trees(target_val, batch_unsuperv.decoded_trees)
 
-
-                s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
-                    Tree.compare_trees(target_val, batch_unsuperv.decoded_trees)
-
-                summary.print_unsupervised_validation_summary(res,res_b, s_avg, v_avg,tot_pos_uns,matched_pos_uns,total_word_uns,
-                                                      matched_word_uns,i)
+                summary.print_unsupervised_validation_summary(res,res_b,i ,tree_decoder=True, s_avg=s_avg, v_avg=v_avg,tot_pos_uns=tot_pos_uns,
+                    matched_pos_uns=matched_pos_uns,total_word_uns=total_word_uns,matched_word_uns=matched_word_uns) if tree_decoder else \
+                summary.print_unsupervised_validation_summary(res,res_b,i ,tree_decoder=False)
 
 
 def train_flat_decoder(decoder, root_emb,current_batch_target):
@@ -162,15 +171,15 @@ def train_flat_decoder(decoder, root_emb,current_batch_target):
 
     # compute loss among the non padded vector
     current_batch_target = tf.unstack(current_batch_target)
-    batch_dec = tf.unstack(batch_dec)
+    batch_dec = tf.unstack(batch_dec[:,1:,:])
     targets = []
     preds = []
     for target, pred in zip(current_batch_target, batch_dec):
         padding = tf.where(tf.equal(target, 0))
         if padding.shape[0] == 0:
             padding = tf.constant([[target.shape[0]]])
-        targets.append(target[:padding[0][0]])
-        preds.append(pred[:padding[0][0]])
+        targets.append(target[1:padding[0][0]])
+        preds.append(pred[:padding[0][0]-1])
     targets = tf.concat([t for t in targets], axis=0)
     preds = tf.concat([t for t in preds], axis=0)
     all_words_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=targets, logits=preds)

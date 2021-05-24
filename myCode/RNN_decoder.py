@@ -40,10 +40,6 @@ class NIC_Decoder(tf.keras.Model):
 
         states = [tf.zeros(shape=(features.shape[0], self.units))] * 2
 
-        if flat_decoder:
-            end_token = shared_list.tokenizer.word_index['<end>']
-            end_generation =[False]*features.shape[0]
-
         max_length = pos_embs.shape[1] if max_length==None else max_length
         to_return=[]
 
@@ -65,19 +61,12 @@ class NIC_Decoder(tf.keras.Model):
             predictions=self.final_layer(rnn_output)
             to_return.append(predictions)
 
-            if flat_decoder:
-                ended_sequences = tf.where(tf.equal( tf.squeeze(tf.argmax(predictions,axis=-1)) , end_token))
-                for idx in ended_sequences:
-                    end_generation[idx]=True
-                if all(end_generation):
-                    break
-
         to_return = tf.concat([item for item in to_return],axis=1)
         return to_return
 
-    def beam_search(self,features,pos_embs,sentences_len):
+    def beam_search(self,features,pos_embs,sentences_len,flat_decoder):
         # helper functions
-        def first_words_pred(features,current_pos):
+        def first_words_pred(features):#,current_pos):
             # get sentences number and expand image features
             n_sentences = features.shape[0]
             rnn_input = tf.expand_dims( features,axis=1)
@@ -85,6 +74,11 @@ class NIC_Decoder(tf.keras.Model):
             # perform first words prediction and keep for each of them the top-k
             states = [tf.zeros(shape=(n_sentences, self.units))] * 2 # initial states are zero vectors
             rnn_output, state_h, state_c = self.rnn(rnn_input, initial_state=states, training=False)
+            if flat_decoder:
+                start_token = shared_list.tokenizer.word_index['<start>']
+                start_vectors = tf.expand_dims( tf.tile([start_token],[n_sentences]) ,axis=-1)
+                rnn_input = self.embedding_layer(start_vectors)
+                rnn_output, state_h, state_c = self.rnn(rnn_input, initial_state=[state_h,state_c], training=False)
             predictions = tf.nn.softmax(self.final_layer(rnn_output), axis=-1)
             beam_ris = tf.math.top_k(predictions, k=self.beam,sorted=True)
 
@@ -134,9 +128,9 @@ class NIC_Decoder(tf.keras.Model):
 
             return current_seqs, new_states, last_words,sen_len_offset
 
-        def single_beam_step(current_seqs,last_words,current_pos,states,sen_len_offsets):
+        def single_beam_step(current_seqs,last_words,states,sen_len_offsets):#,current_pos,states,sen_len_offsets):
             # get relative embedding and call rnn
-            n_sens = sen_len_offsets.shape[0]
+            n_sens = current_seqs['k_sequences'].shape[0]
 
             # from embedding to predictions
             prev_word_embedding = self.embedding_layer(last_words)
@@ -156,24 +150,32 @@ class NIC_Decoder(tf.keras.Model):
             beam_ris = tf.math.top_k(current_preds, k=self.beam,sorted=True)
             return beam_ris, state_h,state_c
 
+        def get_results_tree(current_seqs, sentences_len):
+            idxs = np.argsort(current_seqs['computed_idxs'])
+            preds = current_seqs['computed_seqs']
+            final_pred = [tf.one_hot(preds[i], depth=self.vocab_size) for i in idxs]
+            for i in range(len(sentences_len)):
+                assert final_pred[i].shape[0] == sentences_len[i]
+            print(tf.reduce_mean(tf.math.exp(current_seqs['pred_probs'])))
+            return final_pred
+
+        def get_results_flat(current_seqs):
+            predicted_sens =tf.one_hot(current_seqs['k_sequences'][:,0,:],depth=self.vocab_size)
+            return  predicted_sens
 
         # main function
-        max_length = max(sentences_len)
-        assert min(sentences_len)>=2
-        current_seqs, last_words,states = first_words_pred(features,pos_embs[:,0,:])
+        max_length = sentences_len if flat_decoder else max(sentences_len)
+        if not flat_decoder:
+            assert min(sentences_len)>=2
+        current_seqs, last_words,states = first_words_pred(features)#,pos_embs[:,0,:])
         sen_len_offset = sentences_len-1
 
         # main loop
         for j in range(1,max_length):
-            beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words,pos_embs[:,j,:], states,sen_len_offset)
+            beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words,states,sen_len_offset)#pos_embs[:,j,:], states,sen_len_offset)
             current_seqs, states,last_words, sen_len_offset = \
                 beam_update(beam_ris, current_seqs,sen_len_offset, current_states_h,current_states_c,)
 
         # after the loop, take the sentences predicted, sort them and transform indexes to one_hot vecotrs
-        idxs = np.argsort(current_seqs['computed_idxs'])
-        preds = current_seqs['computed_seqs']
-        final_pred = [tf.one_hot(preds[i],depth=self.vocab_size) for i in idxs]
-        for i in range(len(sentences_len)):
-            assert  final_pred[i].shape[0]==sentences_len[i]
-        print(tf.reduce_mean(tf.math.exp(current_seqs['pred_probs'])))
+        final_pred = get_results_flat(current_seqs) if flat_decoder else get_results_tree(current_seqs,sentences_len)
         return final_pred

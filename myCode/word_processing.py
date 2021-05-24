@@ -83,7 +83,7 @@ def words_predictions(word_module, batch_idxs, inp, targets, TR,roots_emb,perm2u
         if samp:
             predictions = word_module.sampling(roots_emb,inputs)
         else:
-            predictions =  word_module.beam_search(roots_emb,inputs,sentences_len)
+            predictions =  word_module.beam_search(roots_emb,inputs,sentences_len,flat_decoder=False)
     # unzip data (reshape as 2D matrix)
     vals = unzip_data(predictions,sentences_len,perm2unsort,samp)
     return vals
