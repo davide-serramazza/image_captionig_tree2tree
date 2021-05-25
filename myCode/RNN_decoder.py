@@ -66,7 +66,7 @@ class NIC_Decoder(tf.keras.Model):
 
     def beam_search(self,features,pos_embs,sentences_len,flat_decoder):
         # helper functions
-        def first_words_pred(features):#,current_pos):
+        def first_words_pred(features,flat_decoder):#,current_pos):
             # get sentences number and expand image features
             n_sentences = features.shape[0]
             rnn_input = tf.expand_dims( features,axis=1)
@@ -98,7 +98,7 @@ class NIC_Decoder(tf.keras.Model):
                 'pred_probs' : []}
             return current_preds, tf.reshape(beam_ris.indices,shape=[-1,1]), states
 
-        def beam_update(beam_ris, current_seqs,sen_len_offset,states_h,states_c):
+        def beam_update(beam_ris, current_seqs,sen_len_offset,states_h,states_c,flat_decoder):
             # get number of sentences and their 'length offset'
             n_sentences = beam_ris.indices.shape[0]
             sen_len_offset = sen_len_offset-1
@@ -128,7 +128,7 @@ class NIC_Decoder(tf.keras.Model):
 
             return current_seqs, new_states, last_words,sen_len_offset
 
-        def single_beam_step(current_seqs,last_words,states,sen_len_offsets):#,current_pos,states,sen_len_offsets):
+        def generic_beam_step(current_seqs,last_words,states,sen_len_offsets):#,current_pos,states,sen_len_offsets):
             # get relative embedding and call rnn
             n_sens = current_seqs['k_sequences'].shape[0]
 
@@ -167,14 +167,14 @@ class NIC_Decoder(tf.keras.Model):
         max_length = sentences_len if flat_decoder else max(sentences_len)
         if not flat_decoder:
             assert min(sentences_len)>=2
-        current_seqs, last_words,states = first_words_pred(features)#,pos_embs[:,0,:])
+        current_seqs, last_words,states = first_words_pred(features,flat_decoder)#,pos_embs[:,0,:])
         sen_len_offset = sentences_len-1
 
         # main loop
         for j in range(1,max_length):
-            beam_ris, current_states_h,current_states_c = single_beam_step(current_seqs, last_words,states,sen_len_offset)#pos_embs[:,j,:], states,sen_len_offset)
+            beam_ris, current_states_h,current_states_c = generic_beam_step(current_seqs, last_words,states,sen_len_offset)#pos_embs[:,j,:], states,sen_len_offset)
             current_seqs, states,last_words, sen_len_offset = \
-                beam_update(beam_ris, current_seqs,sen_len_offset, current_states_h,current_states_c,)
+                beam_update(beam_ris, current_seqs,sen_len_offset, current_states_h,current_states_c,flat_decoder)
 
         # after the loop, take the sentences predicted, sort them and transform indexes to one_hot vecotrs
         final_pred = get_results_flat(current_seqs) if flat_decoder else get_results_tree(current_seqs,sentences_len)

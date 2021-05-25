@@ -31,7 +31,7 @@ def load_flat_captions(data,val_data):
         val_all_captions.append([])
         current_img_captions = data[name]
         for sentence in current_img_captions:
-            val_all_captions[-1].append( sentence.split(" ") )
+            val_all_captions[-1].append( sentence )
     return val_all_captions
 
 def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
@@ -60,13 +60,14 @@ def extract_words(predictions, beam):
     predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) ) if beam else tf.unstack( tf.argmax(predictions[:,1:,:],axis=-1) )
     sentences = []
     for sen in predicted_words:
-        sentences.append([])
+        s=""
         for word in sen:
             word = shared_list.tokenizer.index_word[ word.numpy()]
             if word=='<end>':
                 break
             else:
-                sentences[-1].append( word )
+                s+=( word +" ")
+        sentences.append(s)
     return sentences
 
 #######################
@@ -130,7 +131,10 @@ def extract_words_from_tree(trees):
     for tree in trees:
         current_pred = []
         take_word_vectors(tree,current_pred)
-        to_return.append(current_pred)
+        s=""
+        for el in current_pred:
+            s+=(el+" ")
+        to_return.append(s)
     return to_return
 
 

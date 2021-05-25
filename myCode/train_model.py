@@ -75,87 +75,16 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees) if tree_decoder else \
                         extract_words(batch_unsuperv,beam=False)
 
+                res = compute_scores(flat_val_captions, pred_sentences)
 
-
-
-
-
-
-
-                refs = dict()
-                preds = dict()
-                j=0
-                for pred,ref in zip(pred_sentences,flat_val_captions):
-                    p = ""
-                    r = []
-                    for el in pred:
-                        p += el+" "
-                    preds[j]=[p]
-
-                    for single_ref in ref:
-                        tmp= ""
-                        for el in single_ref[:-1]:
-                            tmp+=el+" "
-                        r.append(tmp)
-                    refs[j]=r
-
-                    j+=1
-
-                scores = [Bleu(4) , Rouge() , Cider() ]
-                res = dict()
-                for scorer in scores:
-                    score, scores = scorer.compute_score(refs,preds)
-                    res[scorer.method()] =  score
-
-                meteor = 0
-                for pred,ref in zip(preds.items(),refs.items()):
-                    meteor += meteor_score(ref[1],pred[1][0])
-                meteor/=len(preds)
-                res['METEOR'] = meteor
-
-
-
-            # beam
+                # beam
                 batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)  if tree_decoder else \
                     decoder.beam_search(features=batch_val_enc,pos_embs=None, sentences_len=sen_max_len,flat_decoder=True)
                 pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees) if tree_decoder else \
                     extract_words(batch_unsuperv,beam=True)
 
+                res_b = compute_scores(flat_val_captions, pred_sentences_b)
 
-
-
-
-                refs = dict()
-                preds = dict()
-                j=0
-                for pred,ref in zip(pred_sentences_b,flat_val_captions):
-                    p = ""
-                    r = []
-                    for el in pred:
-                        p += el+" "
-                    preds[j]=[p]
-
-                    for single_ref in ref:
-                        tmp= ""
-                        for el in single_ref[:-1]:
-                            tmp+=el+" "
-                        r.append(tmp)
-                    refs[j]=r
-
-                    j+=1
-
-                scores = [Bleu(4) , Rouge() , Cider() ]
-
-                res_b = dict()
-                for scorer in scores:
-                    score, scores = scorer.compute_score(refs,preds)
-                    res_b[scorer.method()] =  score
-
-                meteor = 0
-                for pred,ref in zip(preds.items(),refs.items()):
-                    meteor += meteor_score(ref[1],pred[1][0])
-                meteor/=len(preds)
-                res_b['METEOR'] = meteor
 
                 if tree_decoder:
                     s_avg, v_avg, tot_pos_uns, matched_pos_uns, total_word_uns ,matched_word_uns= \
@@ -164,6 +93,28 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 summary.print_unsupervised_validation_summary(res,res_b,i ,tree_decoder=True, s_avg=s_avg, v_avg=v_avg,tot_pos_uns=tot_pos_uns,
                     matched_pos_uns=matched_pos_uns,total_word_uns=total_word_uns,matched_word_uns=matched_word_uns) if tree_decoder else \
                 summary.print_unsupervised_validation_summary(res,res_b,i ,tree_decoder=False)
+
+
+
+def compute_scores(flat_val_captions, pred_sentences):
+    refs = dict()
+    preds = dict()
+    j = 0
+    for pred, ref in zip(pred_sentences, flat_val_captions):
+        preds[j] = [pred]
+        refs[j] = ref
+        j += 1
+    scores = [Bleu(4), Rouge(), Cider()]
+    res = dict()
+    for scorer in scores:
+        score, scores = scorer.compute_score(refs, preds)
+        res[scorer.method()] = score
+    meteor = 0
+    for pred, ref in zip(preds.items(), refs.items()):
+        meteor += meteor_score(ref[1], pred[1][0])
+    meteor /= len(preds)
+    res['METEOR'] = meteor
+    return res
 
 
 def train_flat_decoder(decoder, root_emb,current_batch_target):
