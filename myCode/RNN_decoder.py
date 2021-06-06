@@ -112,11 +112,21 @@ class NIC_Decoder(tf.keras.Model):
 
             # save the sequences which have reached their length
             computed_seqs = np.where(sen_len_offset==0)
-            for i in computed_seqs[0]:
-                predicted = new_sequencies[i][0]
-                current_seqs['computed_seqs'].append(predicted)#tf.pad(predicted,[[0,max_length-len]],'CONSTANT'))
-                current_seqs['computed_idxs'].append(i)
-                current_seqs['pred_probs'].append(current_seqs['probs'][i][0])
+            if flat_decoder:
+                end_token = shared_list.tokenizer.word_index['<end>']
+                top_words = tf.stack(current_pred_words)[:,0]
+                end_sentences = tf.where( tf.equal(top_words, end_token))
+                for idx in end_sentences[:,0]:
+                    if idx.numpy() not in current_seqs['computed_idxs']:
+                        current_seqs['computed_seqs'].append(prev_sequencies[idx][0])
+                        current_seqs['computed_idxs'].append(idx.numpy())
+                        current_seqs['pred_probs'].append(current_seqs['probs'][idx][0])
+            else:
+                for i in computed_seqs[0]:
+                    predicted = new_sequencies[i][0]
+                    current_seqs['computed_seqs'].append(predicted)#tf.pad(predicted,[[0,max_length-len]],'CONSTANT'))
+                    current_seqs['computed_idxs'].append(i)
+                    current_seqs['pred_probs'].append(current_seqs['probs'][i][0])
 
             # keep track of RNN states, sequences and related probabilities and last words for the next iterations
             states_idxs = [current_runs[i]+i*self.beam for i in range(n_sentences)]
@@ -159,8 +169,17 @@ class NIC_Decoder(tf.keras.Model):
             print(tf.reduce_mean(tf.math.exp(current_seqs['pred_probs'])))
             return final_pred
 
-        def get_results_flat(current_seqs):
-            predicted_sens =tf.one_hot(current_seqs['k_sequences'][:,0,:],depth=self.vocab_size)
+        def get_results_flat(current_seqs,n_sen):
+            a=2
+            for i in range(n_sen):
+                if i not in current_seqs['computed_idxs']:
+                    current_seqs['computed_seqs'].append(current_seqs['k_sequences'][i][0])#tf.pad(predicted,[[0,max_length-len]],'CONSTANT'))
+                    current_seqs['computed_idxs'].append(i)
+                    current_seqs['pred_probs'].append(current_seqs['probs'][i][0])
+            idxs = np.argsort(current_seqs['computed_idxs'])
+            predicted_sens = [current_seqs['computed_seqs'][i] for i in idxs]
+            predicted_sens =[tf.one_hot(el,depth=self.vocab_size) for el in predicted_sens]
+
             return  predicted_sens
 
         # main function
@@ -176,6 +195,6 @@ class NIC_Decoder(tf.keras.Model):
             current_seqs, states,last_words, sen_len_offset = \
                 beam_update(beam_ris, current_seqs,sen_len_offset, current_states_h,current_states_c,flat_decoder)
 
-        # after the loop, take the sentences predicted, sort them and transform indexes to one_hot vecotrs
-        final_pred = get_results_flat(current_seqs) if flat_decoder else get_results_tree(current_seqs,sentences_len)
+        # after the loop, take the sentences predicted, sort them and transform indexes to one_hot vectors
+        final_pred = get_results_flat(current_seqs,features.shape[0]) if flat_decoder else get_results_tree(current_seqs,sentences_len)
         return final_pred

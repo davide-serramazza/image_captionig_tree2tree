@@ -129,7 +129,7 @@ def get_flat_captions(dev_data,test_data,targets):
     tokenizer.index_word[0] = '<pad>'
 
     shared_list.tokenizer = tokenizer
-    WordValue.update_rep_shape(top_k)
+    WordValue.update_rep_shape(top_k+2)
     return  max_len
 
 def extraxt_topK_words(word_occ,filters):

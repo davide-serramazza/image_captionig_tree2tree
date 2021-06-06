@@ -35,7 +35,7 @@ def load_flat_captions(data,val_data):
     return val_all_captions
 
 def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
-    print('loading image trees....')
+    print('loading images....')
     image_features_extract_model = istanciate_CNN(tree_encoder)
     train_data = read_images(args.train,image_features_extract_model,tree_cnn_type,batch_size)
     val_data = read_images(args.val,image_features_extract_model,tree_cnn_type,batch_size)
@@ -43,7 +43,7 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
         test_data = read_images(args.test,image_features_extract_model,tree_cnn_type,batch_size)
         train_data = train_data+val_data
         val_data = test_data
-    print('loading sentence trees...')
+    print('loading sentences...')
     with open(args.all_captions) as json_file:
         flat_captions = json.load(json_file)
     if tree_decoder:
@@ -56,19 +56,34 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
     return train_data,val_data,flat_val_caption, sen_max_len
 
 
-def extract_words(predictions, beam):
-    predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) ) if beam else tf.unstack( tf.argmax(predictions[:,1:,:],axis=-1) )
+def extract_words(predictions, beam, val_data ,it_n ,name):
+    predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) ) if beam else [tf.argmax(el,axis=-1) for el in predictions]
     sentences = []
-    for sen in predicted_words:
-        s=""
-        for word in sen:
-            word = shared_list.tokenizer.index_word[ word.numpy()]
-            if word=='<end>':
-                break
-            else:
-                s+=( word +" ")
-        sentences.append(s)
+    with open("pred_sens/"+name+"_it="+str(it_n)+"_beam="+str(beam)+".txt", "w+") as file:
+        for (el,sen) in zip(val_data,predicted_words):
+            s=""
+            for word in sen:
+                word = shared_list.tokenizer.index_word[ word.numpy()]
+                if word=='<end>':
+                    break
+                else:
+                    s+=( word +" ")
+            sentences.append(s)
+            file.write(el["name"]+" : "+s+"\n")
     return sentences
+
+def extract_words_from_tree(trees, beam, val_data ,it_n ,name):
+    to_return = []
+    with open("pred_sens/"+name+"_it="+str(it_n)+"_beam="+str(beam)+".txt", "w+") as file:
+        for (tree,img) in zip (trees,val_data):
+            current_pred = []
+            take_word_vectors(tree,current_pred)
+            s=""
+            for el in current_pred:
+                s+=(el+" ")
+            to_return.append(s)
+            file.write(img["name"]+" : "+s+"\n")
+    return to_return
 
 #######################
 
@@ -84,7 +99,7 @@ def define_flags():
 
     tf.flags.DEFINE_integer(
         "max_iter",
-        default=100,
+        default=101,
         help="Maximum number of iteration to train")
 
     tf.flags.DEFINE_integer(
@@ -124,18 +139,6 @@ def take_word_vectors(t ,l:list):
         l.append(t.value.abstract_value)
     for c in t.children:
         take_word_vectors(c,l)
-
-
-def extract_words_from_tree(trees):
-    to_return = []
-    for tree in trees:
-        current_pred = []
-        take_word_vectors(tree,current_pred)
-        s=""
-        for el in current_pred:
-            s+=(el+" ")
-        to_return.append(s)
-    return to_return
 
 
 def compute_max_arity(train_data,val_data,tree_encoder,tree_decoder):
@@ -304,7 +307,6 @@ class Summary ():
             tfs.scalar("metrics/bleu/blue-4",  res['Bleu'][3])
             tfs.scalar("metrics/CIDEr", res['CIDEr'])
             tfs.scalar("metrics/Rouge", res['Rouge'])
-            tfs.scalar("metrics/METEOR",res['METEOR'])
             print("sampling" , res)
 
             tfs.scalar("metrics/bleu/blue-1_b", res_b['Bleu'][0])
@@ -313,7 +315,6 @@ class Summary ():
             tfs.scalar("metrics/bleu/blue-4_b",  res_b['Bleu'][3])
             tfs.scalar("metrics/CIDEr_b", res_b['CIDEr'])
             tfs.scalar("metrics/Rouge_b", res_b['Rouge'])
-            tfs.scalar("metrics/METEOR_b",res_b['METEOR'])
             print("beam    " , res_b, "\n")
 
             if tree_decoder:

@@ -8,7 +8,6 @@ from helper_functions import Summary
 from pycocoevalcap.bleu.bleu import Bleu
 from pycocoevalcap.rouge.rouge import Rouge
 from pycocoevalcap.cider.cider import Cider
-from nltk.translate.meteor_score import meteor_score
 
 def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 optimizer, beta,clipping,batch_size, sen_max_len,flat_val_captions, tensorboard_name,
@@ -72,16 +71,16 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 # get unsupervised validation loss; first sampling
                 batch_unsuperv = decoder(encodings=batch_val_enc,training=False,samp=True) if tree_decoder else   \
                     decoder.sampling(features=batch_val_enc,max_length=sen_max_len)
-                pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees) if tree_decoder else \
-                        extract_words(batch_unsuperv,beam=False)
+                pred_sentences = extract_words_from_tree(batch_unsuperv.decoded_trees,beam=False,val_data=val_data,it_n=i,name=tensorboard_name)\
+                    if tree_decoder else extract_words(batch_unsuperv,beam=False , val_data=val_data,it_n=i,name=tensorboard_name)
 
                 res = compute_scores(flat_val_captions, pred_sentences)
 
                 # beam
                 batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)  if tree_decoder else \
                     decoder.beam_search(features=batch_val_enc,pos_embs=None, sentences_len=sen_max_len,flat_decoder=True)
-                pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees) if tree_decoder else \
-                    extract_words(batch_unsuperv,beam=True)
+                pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees,beam=True,val_data=val_data,it_n=i,name=tensorboard_name)\
+                    if tree_decoder else extract_words(batch_unsuperv_b,beam=False , val_data=val_data,it_n=i,name=tensorboard_name)
 
                 res_b = compute_scores(flat_val_captions, pred_sentences_b)
 
@@ -109,11 +108,7 @@ def compute_scores(flat_val_captions, pred_sentences):
     for scorer in scores:
         score, scores = scorer.compute_score(refs, preds)
         res[scorer.method()] = score
-    meteor = 0
-    for pred, ref in zip(preds.items(), refs.items()):
-        meteor += meteor_score(ref[1], pred[1][0])
-    meteor /= len(preds)
-    res['METEOR'] = meteor
+    #TODO calcolarsi meteor ex-post
     return res
 
 
