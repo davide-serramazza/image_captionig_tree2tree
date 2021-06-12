@@ -97,7 +97,7 @@ def label_tree_with_sentenceTree(dev_data, test_data, base_path):
             captions.append( read_tree_from_file(join(base_path,name,el)) )
         data['sentences'] = captions
 
-    #count occurency of words
+    # count occurency of words
     word_occ = []
     for data in dev_data:
         for el in data['sentences']:

@@ -67,7 +67,7 @@ def main():
 
     print("begin train")
     name = "emb_dim_"+str(args.emb_tree_word_size)+"_rnn_units_"+str(args.rnn_unit_size)+ \
-           " _beta_"+str(args.beta)+"_hidden_coeff_"+str(args.hidden_coeff)[2:]+"_drop_rate_" + str(args.drop_rate)
+           "_beta_"+str(args.beta)+"_hidden_coeff_"+str(args.hidden_coeff)[2:]+"_drop_rate_" + str(args.drop_rate)
     train_model(FLAGS=FLAGS, decoder=decoder,
                 encoder=encoder, train_data=train_data, val_data=val_data, optimizer=optimizer,
                 beta=args.beta, clipping=clipping, batch_size=batch_size,

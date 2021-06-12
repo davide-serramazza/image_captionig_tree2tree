@@ -1,3 +1,5 @@
+import os
+
 from myCode.read_images_file import read_images
 from myCode.read_sentence import label_tree_with_sentenceTree
 import tensorflow as tf
@@ -8,7 +10,7 @@ from myCode.read_sentence import label_tree_with_real_data, get_flat_captions
 import myCode.shared_POS_words_lists as shared_list
 import xml.etree.ElementTree as ET
 import tensorflow.contrib.summary as tfs
-
+from xml.dom import minidom
 
 ######################
 
@@ -74,15 +76,29 @@ def extract_words(predictions, beam, val_data ,it_n ,name):
 
 def extract_words_from_tree(trees, beam, val_data ,it_n ,name):
     to_return = []
+
+    try:
+        os.mkdir("pred_tree/"+name+"_it="+str(it_n)+"_beam="+str(beam))
+    except:
+        aqwe=2
+
     with open("pred_sens/"+name+"_it="+str(it_n)+"_beam="+str(beam)+".txt", "w+") as file:
         for (tree,img) in zip (trees,val_data):
             current_pred = []
-            take_word_vectors(tree,current_pred)
+
+            root = ET.Element('root')
+            take_word_vectors(tree,current_pred,root)
+            xmlstr = minidom.parseString(ET.tostring(root)).toprettyxml(indent="   ")
+            with open("pred_tree/"+name+"_it="+str(it_n)+"_beam="+str(beam)+"/"+img['name'],'w+') as f:
+                f.write(xmlstr)
+
             s=""
             for el in current_pred:
                 s+=(el+" ")
             to_return.append(s)
+
             file.write(img["name"]+" : "+s+"\n")
+
     return to_return
 
 #######################
@@ -134,11 +150,17 @@ def get_sen_arity(tree : ET.Element):
             max_arity = current_arity
     return max_arity
 
-def take_word_vectors(t ,l:list):
+def take_word_vectors(t ,l:list,node):
     if t.node_type_id=="word":
         l.append(t.value.abstract_value)
+        node.tag = 'word'
+        node.attrib['value'] = t.value.abstract_value
+    else:
+        node.tag = 'POS'
+        node.attrib['value'] = t.value.abstract_value
     for c in t.children:
-        take_word_vectors(c,l)
+        child = ET.SubElement(node,'')
+        take_word_vectors(c,l,child)
 
 
 def compute_max_arity(train_data,val_data,tree_encoder,tree_decoder):

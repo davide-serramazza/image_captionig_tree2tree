@@ -80,7 +80,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
                 batch_unsuperv_b = decoder(encodings=batch_val_enc,training=False,samp=False)  if tree_decoder else \
                     decoder.beam_search(features=batch_val_enc,pos_embs=None, sentences_len=sen_max_len,flat_decoder=True)
                 pred_sentences_b = extract_words_from_tree(batch_unsuperv_b.decoded_trees,beam=True,val_data=val_data,it_n=i,name=tensorboard_name)\
-                    if tree_decoder else extract_words(batch_unsuperv_b,beam=False , val_data=val_data,it_n=i,name=tensorboard_name)
+                    if tree_decoder else extract_words(batch_unsuperv_b,beam=True , val_data=val_data,it_n=i,name=tensorboard_name)
 
                 res_b = compute_scores(flat_val_captions, pred_sentences_b)
 
