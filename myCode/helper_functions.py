@@ -59,7 +59,7 @@ def load_data(args,tree_encoder,tree_decoder,tree_cnn_type,batch_size):
 
 
 def extract_words(predictions, beam, val_data ,it_n ,name):
-    predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) ) if beam else [tf.argmax(el,axis=-1) for el in predictions]
+    predicted_words=tf.unstack( tf.argmax(predictions,axis=-1) ) if not beam else [tf.argmax(el,axis=-1) for el in predictions]
     sentences = []
     with open("pred_sens/"+name+"_it="+str(it_n)+"_beam="+str(beam)+".txt", "w+") as file:
         for (el,sen) in zip(val_data,predicted_words):
@@ -157,7 +157,10 @@ def take_word_vectors(t ,l:list,node):
         node.attrib['value'] = t.value.abstract_value
     else:
         node.tag = 'POS'
-        node.attrib['value'] = t.value.abstract_value
+        try:
+            node.attrib['value'] = t.value.abstract_value
+        except AttributeError:
+            node.attrib['value'] = 'TRUNCATED'
     for c in t.children:
         child = ET.SubElement(node,'')
         take_word_vectors(c,l,child)
