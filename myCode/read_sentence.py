@@ -93,9 +93,7 @@ def label_tree_with_sentenceTree(dev_data, test_data, base_path):
         name = data['name']
         #after got file name, read tree from xml file
         captions = []
-        for el in listdir(join(base_path,name)):
-            captions.append( read_tree_from_file(join(base_path,name,el)) )
-        data['sentences'] = captions
+        data['sentences'] = read_tree_from_file(join(base_path,name+".xml") )
 
     # count occurency of words
     word_occ = []
@@ -121,7 +119,7 @@ def get_flat_captions(dev_data,test_data,targets):
     #count occurency of words
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=10000000, oov_token="<unk>", filters='~')
     tokenizer.fit_on_texts(captions)
-    top_k = len(list(filter(lambda el: el[1] >= 10, tokenizer.word_counts.items())))
+    top_k = len(list(filter(lambda el: el[1] >= 1, tokenizer.word_counts.items())))
 
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters='~')
     tokenizer.fit_on_texts(captions)

@@ -3,10 +3,11 @@ from tensorflow_trees.definition import Tree
 import numpy as np
 import tensorflow as tf
 import os
+import pickle
+#from myCode.tree import *
 
 def read_images(imgs_dir_file,cnn,tree_cnn_type,batch_size):
     """
-    #TODO man
     function that read images form file
     :param imgs_file:
     :return:
@@ -20,7 +21,6 @@ def read_images(imgs_dir_file,cnn,tree_cnn_type,batch_size):
 
             line = f.readline()
             if line == "":
-                # if i'm here file is ended
                 break
 
             tmp = line.split(sep=":")
@@ -54,37 +54,64 @@ def read_images(imgs_dir_file,cnn,tree_cnn_type,batch_size):
                 curr_batch.append(curr_img)
             curr_batch = tf.convert_to_tensor(curr_batch)
             batch_features = cnn(curr_batch)
-            pool = tf.keras.layers.AveragePooling2D(
-                pool_size=(8, 8))  # tf.reshape(batch_features,(batch_features.shape[0], -1, batch_features.shape[3]))
+            pool = tf.keras.layers.AveragePooling2D(pool_size=(8, 8))
             batch_features = pool(batch_features)
             batch_features = tf.reshape(batch_features, shape=(batch_features.shape[0],2048))
             for j in range(batch_features.shape[0]):
                 data[i+j]['img'] = batch_features[j]
 
+    def read_tree_input(data,imgs_dir_file):
+        with open(imgs_dir_file, "rb") as f:
+            dataset = pickle.load(f)
+            for el in dataset:
+                d= {'name' : el['name'], 'img_tree' : reconstruct_tree2(el['tree'])}
+                data.append(d)
     data = []
 
     if cnn==None:
-        read_tree_images(data, imgs_dir_file, tree_cnn_type)
+        #read_tree_images(data, imgs_dir_file, tree_cnn_type)
+        read_tree_input(data,imgs_dir_file)
     else:
         read_flat_images(cnn, data, imgs_dir_file,batch_size)
     return data
 
-def label_with_node_type(tree,name):
-    n = len(tree.children)
+def label_with_node_type(tree):
+    n = len(tree.childs)
     if n==0:
-        tree.node_type_id="leaf"
+        return "leaf"
     elif n==2:
-        tree.node_type_id="internal"
+        return  "internal"
     elif n==4:
-        tree.node_type_id="doubleInternal"
+        print("noooo ",n)
+        return  "doubleInternal"
     elif n>4:
-        tree.node_type_id="othersInternal"
+        print("noooo ",n)
+        return "othersInternal"
     else:
-        tree.node_type_id="othersInternal"
-        print("child number is ", n, tree.node_type_id,name )
+        print("noooo ",n)
+        print("child number is ", n, tree.node_type_id)#,name )
+        return "othersInternal"
 
-    for child in tree.children:
-        label_with_node_type(child,name)
+    #for child in tree.children:
+    #    label_with_node_type(child,name)
+
+
+
+
+def append_to_tree(in_reconstruction_tree,tree):
+    in_reconstruction_tree.value = ImageValueResNet(abstract_value=tree.data)
+    in_reconstruction_tree.node_type_id=label_with_node_type(tree)
+    for el in tree.childs:
+        child = Tree(node_type_id='',children=[],meta={'label': el.label})
+        in_reconstruction_tree.children.append(child)
+        append_to_tree(child,el)
+
+def reconstruct_tree2(tree):
+    root = Tree(node_type_id='internal',children=[],meta={'label': 'root'})
+    append_to_tree(root,tree)
+    return root
+
+
 
 
 def reconstruct_tree(data, tmp,tree_cnn_type):
@@ -95,7 +122,7 @@ def reconstruct_tree(data, tmp,tree_cnn_type):
     travesed_node = []
 
     for i in range(1, len(tmp)):
-        #loop iterating trough tree nodes
+        # loop iterating trough tree nodes
 
         data = get_node_value(tmp[i])
 

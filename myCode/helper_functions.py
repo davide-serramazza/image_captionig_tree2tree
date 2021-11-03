@@ -77,19 +77,17 @@ def extract_words(predictions, beam, val_data ,it_n ,name):
 def extract_words_from_tree(trees, beam, val_data ,it_n ,name):
     to_return = []
 
-    try:
-        os.mkdir("pred_tree/"+name+"_it="+str(it_n)+"_beam="+str(beam))
-    except:
-        aqwe=2
-
     with open("pred_sens/"+name+"_it="+str(it_n)+"_beam="+str(beam)+".txt", "w+") as file:
+        dir_name="pred_tree/"+name+"_it="+str(it_n)+"_beam="+str(beam)+"/"
+        os.mkdir(dir_name)
         for (tree,img) in zip (trees,val_data):
             current_pred = []
 
             root = ET.Element('root')
             take_word_vectors(tree,current_pred,root)
             xmlstr = minidom.parseString(ET.tostring(root)).toprettyxml(indent="   ")
-            with open("pred_tree/"+name+"_it="+str(it_n)+"_beam="+str(beam)+"/"+img['name'],'w+') as f:
+
+            with open(dir_name+img['name'],'w+') as f:
                 f.write(xmlstr)
 
             s=""
@@ -120,7 +118,7 @@ def define_flags():
 
     tf.flags.DEFINE_integer(
         "check_every",
-        default=5,
+        default=20,
         help="How often (iterations) to check performances")
 
     tf.flags.DEFINE_integer(
@@ -134,7 +132,7 @@ def define_flags():
         help="Directory to put the model summaries, parameters and checkpoint.")
 
 
-def get_image_arity(t ):
+def get_image_arity(t):
     max_arity = len(t.children)
     for child in t.children:
         actual_arity = get_image_arity(child)
@@ -210,146 +208,26 @@ def get_input_target_minibatch(data,j,batch_size,tree_encoder,tree_decoder):
         captions = tf.convert_to_tensor(cap_vector)
     return images,captions
 
-class Summary ():
-    def __init__(self,train):
-        self.loss_struct = 0
-        self.loss_value = 0
-        self.loss_POS = 0
-        self.loss_word = 0
-        self.h_norm_it= 0
-        self.w_norm_it= 0
-        #grads
-        self.gnorm_tot_it= 0
-        self.gnorm_enc_it=0
-        self.gnorm_dec_it=0
-        self.gnorm_RNN_it=0
-        self.gnorm_wordModule_it=0
-        #grads clipped
-        self.gnorm_tot_it_clipped= 0
-        self.gnorm_enc_it_clipped=0
-        self.gnorm_dec_it_clipped=0
-        self.gnorm_RNN_it_clipped=0
-        self.gnorm_wordModule_it_clipped=0
+def dump_in_tensorboard(losses_current_it,loss_validation=None,res_sampling=None,res_beam=None,tree_comparison_ris=None):
+    if loss_validation==None:
+        tfs.scalar("loss/struct", losses_current_it["struct"])
+        tfs.scalar("loss/pos", losses_current_it["pos"])
+        tfs.scalar("loss/word", losses_current_it["word"])
+    elif losses_current_it==None:
+        tfs.scalar("loss/validation_struct", loss_validation["struct"])
+        tfs.scalar("loss/validation_pos", loss_validation["pos"])
+        tfs.scalar("loss/validation_word", loss_validation["word"])
+        tfs.scalar("metric/sampling/CIDEr", res_sampling["CIDEr"])
+        tfs.scalar("metric/sampling/BLeu", res_sampling["Bleu"])
+        tfs.scalar("metric/sampling/Rouge", res_sampling["Rouge"])
+        tfs.scalar("metric/beam/CIDEr", res_beam["CIDEr"])
+        tfs.scalar("metric/beam/BLeu", res_beam["Bleu"])
+        tfs.scalar("metric/beam/Rouge", res_beam["Rouge"])
 
-        self.n_miniBatch = 0
-        self.train = train
+        tfs.scalar("overlaps/struct_avg", tree_comparison_ris["overlaps_s"])
+        tfs.scalar("overlaps/struct_acc", tree_comparison_ris["overlaps_v"])
+        tfs.scalar("overlaps/tot_pos", tree_comparison_ris["tot_pos"])
+        tfs.scalar("overlaps/matched_pos", tree_comparison_ris["matched_pos"])
+        tfs.scalar("overlaps/tot_word", tree_comparison_ris["tot_word"])
+        tfs.scalar("overlaps/matched_word", tree_comparison_ris["matched_word"])
 
-
-    def add_miniBatch_summary(self,loss_struct_miniBatch,loss_value_miniBatch,loss_value_miniBatch_pos,loss_value_miniBatch_word,
-                              w_norm,gnorm,grad,grad_clipped,variables):
-
-        if loss_struct_miniBatch is not None:
-            self.loss_struct += loss_struct_miniBatch
-            self.loss_value += loss_value_miniBatch
-            self.loss_POS += loss_value_miniBatch_pos
-        self.loss_word +=  loss_value_miniBatch_word
-        self.w_norm_it += w_norm
-
-        enc_v=[]
-        dec_v=[]
-        rnn_v=[]
-        word_module_v=[]
-
-        enc_v_clipped=[]
-        dec_v_clipped=[]
-        rnn_v_clipped=[]
-        word_module_v_clipped=[]
-
-        for (g,gc,v) in zip (grad,grad_clipped,variables):
-            if "cnn__encoder" in v.name:
-                enc_v.append(g)
-                enc_v_clipped.append(gc)
-            elif 'final_word_pred' in v.name or 'word_embedding' in v.name:
-                word_module_v.append(g)
-                word_module_v_clipped.append(gc)
-            elif 'LSTM' in v.name:
-                word_module_v.append(g)
-                rnn_v.append(g)
-                word_module_v_clipped.append(gc)
-                rnn_v_clipped.append(gc)
-            else:
-                dec_v.append(g)
-                dec_v_clipped.append(gc)
-
-        self.gnorm_tot_it += gnorm
-        self.gnorm_enc_it += tf.global_norm(enc_v)
-        self.gnorm_dec_it += tf.global_norm(dec_v)
-        self.gnorm_RNN_it += tf.global_norm(rnn_v)
-        self.gnorm_wordModule_it += tf.global_norm(word_module_v)
-
-        self.gnorm_tot_it_clipped += tf.global_norm(grad_clipped)
-        self.gnorm_enc_it_clipped += tf.global_norm(enc_v_clipped)
-        self.gnorm_dec_it_clipped += tf.global_norm(dec_v_clipped)
-        self.gnorm_RNN_it_clipped += tf.global_norm(rnn_v_clipped)
-        self.gnorm_wordModule_it_clipped += tf.global_norm(word_module_v_clipped)
-
-        self.n_miniBatch+=1
-
-    def print_summary(self,it):
-        name = "" if self.train else "val"
-        tfs.scalar("loss/loss_struc"+name, self.loss_struct /self.n_miniBatch)
-        tfs.scalar("loss/loss_value"+name, self.loss_value /self.n_miniBatch)
-        tfs.scalar("loss/loss_value_POS"+name, self.loss_POS /self.n_miniBatch)
-        tfs.scalar("loss/loss_value_word"+name, self.loss_word /self.n_miniBatch)
-        tfs.scalar("norms/hidden representation norm"+name, self.h_norm_it/self.n_miniBatch)
-        tfs.scalar("norms/square of weights norm"+name, self.w_norm_it/self.n_miniBatch)
-
-        tfs.scalar("norms/grad"+name, self.gnorm_tot_it /self.n_miniBatch)
-        tfs.scalar("norms/dec_grad"+name, self.gnorm_dec_it/self.n_miniBatch)
-        tfs.scalar("norms/RNN_grad"+name, self.gnorm_RNN_it/self.n_miniBatch)
-        tfs.scalar("norms/word_module_grad"+name, self.gnorm_wordModule_it/self.n_miniBatch)
-        tfs.scalar("norms/enc_grad"+name, self.gnorm_enc_it/self.n_miniBatch)
-
-        tfs.scalar("norms/grad_clipped"+name, self.gnorm_tot_it_clipped /self.n_miniBatch)
-        tfs.scalar("norms/dec_grad_clipped"+name, self.gnorm_dec_it_clipped/self.n_miniBatch)
-        tfs.scalar("norms/RNN_grad_clipped"+name, self.gnorm_RNN_it_clipped/self.n_miniBatch)
-        tfs.scalar("norms/word_module_grad_clipped"+name, self.gnorm_wordModule_it_clipped/self.n_miniBatch)
-        tfs.scalar("norms/enc_grad_clipped"+name, self.gnorm_enc_it_clipped/self.n_miniBatch)
-
-        print("iterartion",it,self.loss_struct /self.n_miniBatch,self.loss_word /self.n_miniBatch,
-              self.loss_POS /self.n_miniBatch)
-
-        return self.loss_word /self.n_miniBatch, self.loss_POS /self.n_miniBatch
-
-    def print_supervised_validation_summary(self,loss_struct_val, loss_validation,loss_values_validation_pos,
-            loss_values_validation_word,loss_word, loss_POS,it):
-
-        tfs.scalar("loss/validation/loss_struc", loss_struct_val)
-        tfs.scalar("loss/validation/loss_value", loss_validation)
-        tfs.scalar("loss/validation/loss_value_POS", loss_values_validation_pos)
-        tfs.scalar("loss/validation/loss_value_word", loss_values_validation_word)
-
-        print("iteration ", it, " supervised:\nloss train word is ", loss_word, " loss train POS is ", loss_POS , "\n",
-              " loss validation word is ", loss_values_validation_word, " loss validation POS is ", loss_values_validation_pos)
-
-
-    def print_unsupervised_validation_summary(self,res,res_b,it,tree_decoder, s_avg=None, v_avg=None ,tot_pos_uns=None ,
-        matched_pos_uns=None,total_word_uns=None,matched_word_uns=None):
-
-            tfs.scalar("metrics/bleu/blue-1", res['Bleu'][0])
-            tfs.scalar("metrics/bleu/blue-2",  res['Bleu'][1])
-            tfs.scalar("metrics/bleu/blue-3",  res['Bleu'][2])
-            tfs.scalar("metrics/bleu/blue-4",  res['Bleu'][3])
-            tfs.scalar("metrics/CIDEr", res['CIDEr'])
-            tfs.scalar("metrics/Rouge", res['Rouge'])
-            print("sampling" , res)
-
-            tfs.scalar("metrics/bleu/blue-1_b", res_b['Bleu'][0])
-            tfs.scalar("metrics/bleu/blue-2_b",  res_b['Bleu'][1])
-            tfs.scalar("metrics/bleu/blue-3_b",  res_b['Bleu'][2])
-            tfs.scalar("metrics/bleu/blue-4_b",  res_b['Bleu'][3])
-            tfs.scalar("metrics/CIDEr_b", res_b['CIDEr'])
-            tfs.scalar("metrics/Rouge_b", res_b['Rouge'])
-            print("beam    " , res_b, "\n")
-
-            if tree_decoder:
-                tfs.scalar("overlaps/unsupervised/struct_avg", s_avg)
-                tfs.scalar("overlaps/unsupervised/value_avg", v_avg)
-                tfs.scalar("overlaps/unsupervised/total_POS", tot_pos_uns)
-                tfs.scalar("overlaps/unsupervised/matched_POS", matched_pos_uns)
-                tfs.scalar("overlaps/unsupervised/total_words", total_word_uns)
-                tfs.scalar("overlaps/unsupervised/matched_words", matched_word_uns)
-
-                print("iteration ", it, " unsupervised:\n", matched_pos_uns," out of ", tot_pos_uns, " POS match",
-                      "that is a perc of", (matched_pos_uns/tot_pos_uns)*100, " " ,matched_word_uns, " out of ",total_word_uns,
-                      "word match that is a percentage of ", (matched_word_uns/total_word_uns)*100, " struct val ", s_avg)

@@ -51,6 +51,20 @@ class ImageValueInceptionRoot(NodeDefinition.Value):
     def abstract_to_representation_batch(v):
         return tf.Variable(v,dtype=tf.float32)
 
+class ImageValueResNet(NodeDefinition.Value):
+    """
+    class modelling single tree image node
+    """
+    representation_shape = 1024
+    class_value = False
+
+    @staticmethod
+    def representation_to_abstract_batch(t:tf.Tensor):
+        return t.numpy()
+
+    @staticmethod
+    def abstract_to_representation_batch(v):
+        return tf.Variable(v,dtype=tf.float32)
 
 class ImageTree:
     """
@@ -78,6 +92,15 @@ class ImageTree:
             ])
 
             self.node_types = self.tree_def.node_types
+
+        elif tree_cnn_type=="resNet":
+
+            self.tree_def = TreeDefinition(node_types=[
+                #NodeDefinition("othersInternal",may_root=True,arity=NodeDefinition.VariableArity(min_value=5),value_type=ImageValueResNet),
+                #NodeDefinition("doubleInternal",may_root=True,arity=NodeDefinition.FixedArity(4),value_type=ImageValueResNet),
+                NodeDefinition("internal",may_root=True,arity=NodeDefinition.FixedArity(2),value_type=ImageValueResNet),
+                NodeDefinition("leaf",may_root=False,arity=NodeDefinition.FixedArity(0),value_type=ImageValueResNet)
+            ])
 
         else:
             sys.exit("cnn type should be inception or alexnet")

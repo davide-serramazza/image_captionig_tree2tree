@@ -140,7 +140,8 @@ class Tree:
         overlaps_s_avg = float(np.mean(overlaps_s))
         overlaps_v_avg = float(np.mean(overlaps_v))
 
-        return overlaps_s_avg, overlaps_v_avg,np.sum(tot_pos),np.sum(matched_pos),np.sum(tot_word),np.sum(matched_word)
+        return {"overlaps_s" : overlaps_s_avg, "overlaps_v" : overlaps_v_avg, "tot_pos" : np.sum(tot_pos), \
+                "matched_pos" : np.sum(matched_pos), "tot_word":np.sum(tot_word), "matched_word" : np.sum(matched_word)}
 
 
 class TrainingTree(Tree): # TODO remove class, no more needed. move tr_gt_value in Tree.meta
@@ -166,7 +167,7 @@ class NodeDefinition:
             :param abstract_value: actual value
             :param representation: tensor representation e.g. 1ofk representation
             """
-            if abstract_value == representation or (abstract_value is not None and representation is not None):
+            if abstract_value is representation or (abstract_value is not None and representation is not None):
                 raise ValueError("Initialize with Value XOR Representation")
 
             self._abstract_value = None
