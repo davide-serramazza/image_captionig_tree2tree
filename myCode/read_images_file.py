@@ -75,22 +75,17 @@ def read_images(imgs_dir_file,cnn,tree_cnn_type,batch_size):
         read_flat_images(cnn, data, imgs_dir_file,batch_size)
     return data
 
-def label_with_node_type(tree):
-    n = len(tree.childs)
-    if n==0:
-        return "leaf"
-    elif n==2:
-        return  "internal"
-    elif n==4:
-        print("noooo ",n)
-        return  "doubleInternal"
-    elif n>4:
-        print("noooo ",n)
-        return "othersInternal"
+def label_with_node_type(tree,root):
+    if root:
+        return  "root"
     else:
-        print("noooo ",n)
-        print("child number is ", n, tree.node_type_id)#,name )
-        return "othersInternal"
+        n = len(tree.children)
+        if n==0:
+            return "leaf"
+        elif n>=1 and n<=4:
+            return  "internal"
+        else:
+            raise ValueError
 
     #for child in tree.children:
     #    label_with_node_type(child,name)
@@ -98,17 +93,17 @@ def label_with_node_type(tree):
 
 
 
-def append_to_tree(in_reconstruction_tree,tree):
-    in_reconstruction_tree.value = ImageValueResNet(abstract_value=tree.data)
-    in_reconstruction_tree.node_type_id=label_with_node_type(tree)
-    for el in tree.childs:
+def append_to_tree(in_reconstruction_tree,tree,root):
+    in_reconstruction_tree.value = ImageValueResNetRoot(abstract_value=tree.data) if root else ImageValueResNet(abstract_value=tree.data)
+    in_reconstruction_tree.node_type_id=label_with_node_type(tree,root)
+    for el in tree.children:
         child = Tree(node_type_id='',children=[],meta={'label': el.label})
         in_reconstruction_tree.children.append(child)
-        append_to_tree(child,el)
+        append_to_tree(child,el,root=False)
 
 def reconstruct_tree2(tree):
-    root = Tree(node_type_id='internal',children=[],meta={'label': 'root'})
-    append_to_tree(root,tree)
+    root = Tree(node_type_id='root',children=[],meta={'label': 'root'})
+    append_to_tree(root,tree,root=True)
     return root
 
 

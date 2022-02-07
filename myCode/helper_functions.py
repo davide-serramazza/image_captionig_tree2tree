@@ -113,12 +113,12 @@ def define_flags():
 
     tf.flags.DEFINE_integer(
         "max_iter",
-        default=101,
+        default=1001,
         help="Maximum number of iteration to train")
 
     tf.flags.DEFINE_integer(
         "check_every",
-        default=20,
+        default=30,
         help="How often (iterations) to check performances")
 
     tf.flags.DEFINE_integer(
@@ -218,10 +218,16 @@ def dump_in_tensorboard(losses_current_it,loss_validation=None,res_sampling=None
         tfs.scalar("loss/validation_pos", loss_validation["pos"])
         tfs.scalar("loss/validation_word", loss_validation["word"])
         tfs.scalar("metric/sampling/CIDEr", res_sampling["CIDEr"])
-        tfs.scalar("metric/sampling/BLeu", res_sampling["Bleu"])
+        tfs.scalar("metric/sampling/BLeu_1", res_sampling["Bleu"][0])
+        tfs.scalar("metric/sampling/BLeu_2", res_sampling["Bleu"][1])
+        tfs.scalar("metric/sampling/BLeu_3", res_sampling["Bleu"][2])
+        tfs.scalar("metric/sampling/BLeu_4", res_sampling["Bleu"][3])
         tfs.scalar("metric/sampling/Rouge", res_sampling["Rouge"])
         tfs.scalar("metric/beam/CIDEr", res_beam["CIDEr"])
-        tfs.scalar("metric/beam/BLeu", res_beam["Bleu"])
+        tfs.scalar("metric/beam/BLeu_1", res_beam["Bleu"][0])
+        tfs.scalar("metric/beam/BLeu_2", res_beam["Bleu"][1])
+        tfs.scalar("metric/beam/BLeu_3", res_beam["Bleu"][2])
+        tfs.scalar("metric/beam/BLeu_4", res_beam["Bleu"][3])
         tfs.scalar("metric/beam/Rouge", res_beam["Rouge"])
 
         tfs.scalar("overlaps/struct_avg", tree_comparison_ris["overlaps_s"])

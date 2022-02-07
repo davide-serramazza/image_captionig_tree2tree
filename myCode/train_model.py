@@ -57,7 +57,7 @@ def train_model(FLAGS, decoder, encoder, train_data,val_data,
             print("iteration ",i, " loss struct is ",losses_current_it["struct"] , \
             " loss pos is ",losses_current_it["pos"] , " loss word is ",losses_current_it["word"])
 
-            if i % FLAGS.check_every == 0 and i!=0:
+            if i % FLAGS.check_every == 0:
                 input_val,target_val =  get_input_target_minibatch(val_data,0,len(val_data),tree_encoder,tree_decoder)
                 batch_val_enc = encoder(input_val,training=False)
                 if tree_encoder:

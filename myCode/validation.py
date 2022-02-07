@@ -2,6 +2,7 @@ import sys
 import os
 print(os.getcwd())
 os.chdir("..")
+print(os.getcwd(), os.listdir("."))
 sys.path.insert(0, '.')
 
 import argparse
