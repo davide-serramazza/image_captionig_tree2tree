@@ -196,7 +196,7 @@ def get_input_target_minibatch(data,j,batch_size,tree_encoder,tree_decoder):
             #build the tree now
             sentence_tree = Tree(node_type_id="dummy root", children=[],value="dummy")
             label_tree_with_real_data(caption, sentence_tree,shared_list.tokenizer)
-            captions.append( sentence_tree.children[0] )
+            captions.append( sentence_tree )
         else:
             captions.append('<start> ' + choice(el['sentences']) + ' <end>' )
 
