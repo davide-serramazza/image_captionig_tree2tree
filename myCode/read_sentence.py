@@ -65,8 +65,6 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
 
     elif xml_tree.tag == "leaf":
         #check if in tag found in dev set otherwise label as others (last dimension)
-        if value=="navyBlue":
-            value="navyblue"
         idx = tokenizer.word_index[value]
         if idx==[[]]:
             a = 2
