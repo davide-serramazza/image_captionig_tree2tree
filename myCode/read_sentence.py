@@ -65,9 +65,13 @@ def label_tree_with_real_data(xml_tree : ET.Element, final_tree : Tree,tokenizer
 
     elif xml_tree.tag == "leaf":
         #check if in tag found in dev set otherwise label as others (last dimension)
-        idx = tokenizer.texts_to_sequences([value])
+        if value=="navyBlue":
+            value="navyblue"
+        idx = tokenizer.word_index[value]
+        if idx==[[]]:
+            a = 2
         final_tree.node_type_id="word"
-        final_tree.value=WordValue(representation=tf.constant(idx[0][0]))
+        final_tree.value=WordValue(representation=tf.constant(idx))
         for child in xml_tree.getchildren():
             final_tree.children.append(Tree(node_type_id="fake "))
 
@@ -132,16 +136,16 @@ def get_flat_captions(dev_data,test_data,targets):
 
 def extraxt_topK_words(word_occ,filters):
     top_k = 10000000
-    tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters='~')
+    tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k,  filters='~')
     tokenizer.fit_on_texts(word_occ)
     # word number with 5 or more occurrebcy in training
     words_list = (dict(filter(lambda el: el[1] >= 1, tokenizer.word_counts.items())))
     top_k = len(words_list)
-    tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, oov_token="<unk>", filters=filters)
+    tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k, filters=filters)
     tokenizer.fit_on_texts(words_list.keys())
     tokenizer.word_index['<pad>'] = 0
     tokenizer.index_word[0] = '<pad>'
     print("voab dim is ",top_k)
     shared_list.tokenizer = tokenizer
     # top_k+2 since need to add <pad> and <unk> token
-    WordValue.update_rep_shape(top_k+2)
+    WordValue.update_rep_shape(top_k+1)
