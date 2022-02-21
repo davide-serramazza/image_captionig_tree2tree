@@ -63,7 +63,7 @@ class EncoderCellsBuilder:
         return f
 
     @staticmethod
-    def simple_dense_embedder_builder(drop_rate,activation=tf.nn.leaky_relu):
+    def simple_dense_embedder_builder(activation=tf.nn.leaky_relu):
         def f(leaf_def: NodeDefinition, embedding_size, name=None):
 
             return tf.keras.Sequential([
@@ -71,7 +71,6 @@ class EncoderCellsBuilder:
                                          activation=activation,
                                          input_shape=(leaf_def.value_type.representation_shape,),
                                          name=name),
-                tf.keras.layers.Dropout(rate=drop_rate)
                 ])
         return f
 

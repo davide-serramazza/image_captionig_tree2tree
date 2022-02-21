@@ -7,7 +7,7 @@ import tensorflow_trees.decoder_cells as decoder_cell
 import tensorflow_trees.encoder_cells as encoder_cell
 
 def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_node_count, max_depth, hidden_coeff,
-                        activation,emb_word_size,image_tree, sentence_tree,drop_rate,drop_rate_input):
+                        activation,emb_word_size,image_tree, sentence_tree,drop_rate):
 
     decoder_cell.drop_rate = drop_rate
     encoder_cell.drop_rate = drop_rate
@@ -21,7 +21,7 @@ def get_encoder_decoder(emb_tree_size, cut_arity, hidden_word,max_arity, max_nod
                           cellsbuilder=EncoderCellsBuilder(EncoderCellsBuilder.simple_cell_builder(
                               hidden_coef=hidden_coeff, activation=activation,gate=True,drop_rate=drop_rate),
 
-                              EncoderCellsBuilder.simple_dense_embedder_builder(activation=activation,drop_rate=drop_rate_input)))
+                              EncoderCellsBuilder.simple_dense_embedder_builder(activation=activation)))
 
     WordValue.set_embedding_size(emb_word_size)
 
